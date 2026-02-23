@@ -40,6 +40,17 @@ function formatMinutesToHuman(minutesValue) {
   return `${hours}h ${mins}m`;
 }
 
+function normalizeReportSettings(data) {
+  const overdueDays = Math.max(1, Math.min(30, Math.round(Number(data?.overdue_days || 3))));
+  const healthy = Math.max(1, Math.min(100, Math.round(Number(data?.sla_healthy_threshold || 90))));
+  const monitor = Math.max(0, Math.min(healthy - 1, Math.round(Number(data?.sla_monitor_threshold || 70))));
+  return {
+    overdueDays,
+    slaHealthyThreshold: healthy,
+    slaMonitorThreshold: monitor,
+  };
+}
+
 export default function ReportsPage() {
   const [rangePreset, setRangePreset] = useState('7');
   const [startDate, setStartDate] = useState(toDateInputValue(new Date(Date.now() - 7 * 86400000)));
@@ -48,6 +59,11 @@ export default function ReportsPage() {
   const [techRows, setTechRows] = useState([]);
   const [activitySeries, setActivitySeries] = useState(EMPTY_ACTIVITY_SERIES);
   const [aiInsights, setAiInsights] = useState(null);
+  const [reportSettings, setReportSettings] = useState({
+    overdueDays: 3,
+    slaHealthyThreshold: 90,
+    slaMonitorThreshold: 70,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -64,27 +80,35 @@ export default function ReportsPage() {
     setLoading(true);
     setError('');
     try {
-      const [shifts, techs, activity, aiDashboard] = await Promise.all([
+      const [shifts, techs, activity, aiDashboard, settingsRes] = await Promise.all([
         api.getShiftReport(startDate, endDate),
         api.getTechnicianPerformance(startDate, endDate),
         api.getTicketActivity(startDate, endDate).catch(() => null),
-        api.getAiReviewDashboard(derivedWindowDays).catch(() => null),
+        api.getAiReviewDashboard({ days: derivedWindowDays, startDate, endDate }).catch(() => null),
+        api.getReportSettings().catch(() => null),
       ]);
 
       const shiftData = shifts?.data || shifts || [];
       const techData = techs?.data || techs || [];
       const activityData = activity?.data?.series || EMPTY_ACTIVITY_SERIES;
       const aiData = aiDashboard?.data || null;
+      const settings = normalizeReportSettings(settingsRes?.data || null);
 
       setShiftRows(Array.isArray(shiftData) ? shiftData : []);
       setTechRows(Array.isArray(techData) ? techData : []);
       setActivitySeries(activityData);
       setAiInsights(aiData);
+      setReportSettings(settings);
     } catch (e) {
       setShiftRows([]);
       setTechRows([]);
       setActivitySeries(EMPTY_ACTIVITY_SERIES);
       setAiInsights(null);
+      setReportSettings({
+        overdueDays: 3,
+        slaHealthyThreshold: 90,
+        slaMonitorThreshold: 70,
+      });
       setError(e?.message || 'Failed to load reports from server.');
     } finally {
       setLoading(false);
@@ -265,7 +289,13 @@ export default function ReportsPage() {
           <ReportStatCard title="Resolved Tickets" value={summary.totalResolved} subtitle="Completed in selected range" icon={TicketCheck} tone="primary" />
           <ReportStatCard title="Average SLA" value={`${summary.avgSla}%`} subtitle="Technician compliance average" icon={Gauge} tone="secondary" />
           <ReportStatCard title="Avg Resolution Time" value={formatMinutesToHuman(summary.avgResolutionMinutes)} subtitle="Service completion speed" icon={CheckCircle2} tone="secondary" />
-          <ReportStatCard title="Overdue Pressure" value={summary.overdue} subtitle={`Backlog delta ${summary.backlogDelta}`} icon={TriangleAlert} tone="warning" />
+          <ReportStatCard
+            title="Overdue Pressure"
+            value={summary.overdue}
+            subtitle={`Backlog delta ${summary.backlogDelta} | threshold ${reportSettings.overdueDays} day(s)`}
+            icon={TriangleAlert}
+            tone="warning"
+          />
         </div>
 
         {loading ? (
@@ -311,7 +341,13 @@ export default function ReportsPage() {
 
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
               <TechnicianSlaChart rows={techRows} />
-              <SlaDistributionChart rows={techRows} />
+              <SlaDistributionChart
+                rows={techRows}
+                thresholds={{
+                  healthyThreshold: reportSettings.slaHealthyThreshold,
+                  monitorThreshold: reportSettings.slaMonitorThreshold,
+                }}
+              />
               <section id="ai-analytics" className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm xl:col-span-2">
                 <h3 className="text-sm font-semibold text-gray-900">AI Intake & Review Analytics</h3>
                 <p className="mt-1 text-xs text-gray-500">

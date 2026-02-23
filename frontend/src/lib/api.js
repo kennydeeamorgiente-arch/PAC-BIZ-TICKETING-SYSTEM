@@ -196,6 +196,10 @@ class API {
     return this.get(`/reports/ticket-activity?start=${startDate}&end=${endDate}`);
   }
 
+  async getReportSettings() {
+    return this.get('/reports/settings');
+  }
+
   async getShifts() {
     return this.get('/shifts');
   }
@@ -242,8 +246,12 @@ class API {
     return this.get('/ai-review/metrics');
   }
 
-  async getAiReviewDashboard(days = 30) {
-    return this.get(`/ai-review/dashboard?days=${encodeURIComponent(days)}`);
+  async getAiReviewDashboard({ days = 30, startDate = null, endDate = null } = {}) {
+    const params = new URLSearchParams();
+    params.set('days', String(days));
+    if (startDate) params.set('start', String(startDate));
+    if (endDate) params.set('end', String(endDate));
+    return this.get(`/ai-review/dashboard?${params.toString()}`);
   }
 
   async getAiReviewRecommendations(days = 30) {

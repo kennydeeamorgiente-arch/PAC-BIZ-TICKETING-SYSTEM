@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const { getReportSettings } = require('../services/appConfigService');
 
 function isValidDateInput(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(String(value || ''));
@@ -84,6 +85,8 @@ const getTicketActivity = async (req, res) => {
     }
 
     const params = [start, end];
+    const reportSettings = await getReportSettings();
+    const overdueDays = Number(reportSettings.overdueDays || 3);
 
     const [createdRows] = await db.query(
       `SELECT DATE(t.created_at) AS day, COUNT(*) AS total
@@ -119,15 +122,15 @@ const getTicketActivity = async (req, res) => {
     );
 
     const [overdueRows] = await db.query(
-      `SELECT DATE(DATE_ADD(t.created_at, INTERVAL 3 DAY)) AS day, COUNT(*) AS total
+      `SELECT DATE(DATE_ADD(t.created_at, INTERVAL ? DAY)) AS day, COUNT(*) AS total
        FROM tickets t
        INNER JOIN ticket_statuses ts ON ts.id = t.status_id
        WHERE t.is_deleted = 0
          AND ts.status_code NOT IN ('resolved', 'closed', 'deleted')
-         AND DATE(DATE_ADD(t.created_at, INTERVAL 3 DAY)) BETWEEN ? AND ?
-       GROUP BY DATE(DATE_ADD(t.created_at, INTERVAL 3 DAY))
+         AND DATE(DATE_ADD(t.created_at, INTERVAL ? DAY)) BETWEEN ? AND ?
+       GROUP BY DATE(DATE_ADD(t.created_at, INTERVAL ? DAY))
        ORDER BY day ASC`,
-      params
+      [overdueDays, overdueDays, ...params, overdueDays]
     );
 
     const [collabRows] = await db.query(
@@ -146,6 +149,9 @@ const getTicketActivity = async (req, res) => {
       data: {
         start,
         end,
+        settings: {
+          overdue_days: overdueDays,
+        },
         series: {
           created: createdRows,
           closed: closedRows,
@@ -161,8 +167,26 @@ const getTicketActivity = async (req, res) => {
   }
 };
 
+const getReportSettingsController = async (req, res) => {
+  try {
+    const settings = await getReportSettings();
+    return res.json({
+      success: true,
+      data: {
+        overdue_days: settings.overdueDays,
+        sla_healthy_threshold: settings.slaHealthyThreshold,
+        sla_monitor_threshold: settings.slaMonitorThreshold,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching report settings:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch report settings', error: error.message });
+  }
+};
+
 module.exports = {
   getShiftReport,
   getTechnicianPerformance,
   getTicketActivity,
+  getReportSettings: getReportSettingsController,
 };

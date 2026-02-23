@@ -20,6 +20,10 @@ function isTruthyText(value, fallback = false) {
   return ['1', 'true', 'yes', 'on'].includes(String(value).trim().toLowerCase());
 }
 
+function isValidDateInput(value) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(value || ''));
+}
+
 async function tableExists(tableName) {
   const [rows] = await db.query('SHOW TABLES LIKE ?', [tableName]);
   return rows.length > 0;
@@ -443,6 +447,18 @@ async function getDashboard(req, res) {
     }
 
     const days = Math.max(7, Math.min(365, Number(req.query.days || 30)));
+    const start = String(req.query.start || '').trim();
+    const end = String(req.query.end || '').trim();
+
+    const hasExplicitRange = Boolean(start && end);
+    if (hasExplicitRange && (!isValidDateInput(start) || !isValidDateInput(end))) {
+      return res.status(400).json({ success: false, message: 'Invalid date format for start/end. Use YYYY-MM-DD.' });
+    }
+
+    const aiWhereClause = hasExplicitRange
+      ? 'DATE(created_at) BETWEEN ? AND ?'
+      : 'created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)';
+    const aiWhereParams = hasExplicitRange ? [start, end] : [days];
 
     const [[summary]] = await db.query(
       `SELECT
@@ -455,8 +471,8 @@ async function getDashboard(req, res) {
          SUM(CASE WHEN reviewed_at IS NOT NULL AND predicted_priority_code <> applied_priority_code THEN 1 ELSE 0 END) AS reviewed_override_window,
          AVG(confidence) AS avg_confidence_window
        FROM ai_inferences
-       WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)`,
-      [days]
+       WHERE ${aiWhereClause}`,
+      aiWhereParams
     );
 
     const [weeklyTrend] = await db.query(
@@ -467,10 +483,10 @@ async function getDashboard(req, res) {
               SUM(CASE WHEN reviewed_at IS NOT NULL AND predicted_priority_code = applied_priority_code THEN 1 ELSE 0 END) AS reviewed_agree_count,
               AVG(confidence) AS avg_confidence
        FROM ai_inferences
-       WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
+       WHERE ${aiWhereClause}
        GROUP BY week_start
        ORDER BY week_start ASC`,
-      [days]
+      aiWhereParams
     );
 
     const [sourceQuality] = await db.query(
@@ -482,10 +498,10 @@ async function getDashboard(req, res) {
               SUM(CASE WHEN reviewed_at IS NOT NULL AND predicted_priority_code = applied_priority_code THEN 1 ELSE 0 END) AS reviewed_agree_count,
               SUM(CASE WHEN reviewed_at IS NOT NULL AND predicted_priority_code <> applied_priority_code THEN 1 ELSE 0 END) AS reviewed_override_count
        FROM ai_inferences
-       WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
+       WHERE ${aiWhereClause}
        GROUP BY intake_source
        ORDER BY total DESC`,
-      [days]
+      aiWhereParams
     );
 
     let noiseOutcomes = [];
@@ -495,32 +511,32 @@ async function getDashboard(req, res) {
       [noiseOutcomes] = await db.query(
         `SELECT decision, COUNT(*) AS total, AVG(risk_score) AS avg_risk_score
          FROM incoming_email_quarantine
-         WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
+         WHERE ${aiWhereClause}
          GROUP BY decision
          ORDER BY total DESC`,
-        [days]
+        aiWhereParams
       );
 
       [topNoisySenders] = await db.query(
         `SELECT from_email, COUNT(*) AS total
          FROM incoming_email_quarantine
-         WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
+         WHERE ${aiWhereClause}
            AND decision IN ('ignore', 'quarantine')
          GROUP BY from_email
          ORDER BY total DESC
          LIMIT 10`,
-        [days]
+        aiWhereParams
       );
 
       [topNoisyDomains] = await db.query(
         `SELECT SUBSTRING_INDEX(from_email, '@', -1) AS domain, COUNT(*) AS total
          FROM incoming_email_quarantine
-         WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
+         WHERE ${aiWhereClause}
            AND decision IN ('ignore', 'quarantine')
          GROUP BY domain
          ORDER BY total DESC
          LIMIT 10`,
-        [days]
+        aiWhereParams
       );
     } catch (noiseError) {
       if (!isMissingSchemaError(noiseError)) throw noiseError;
@@ -534,6 +550,7 @@ async function getDashboard(req, res) {
       success: true,
       data: {
         days,
+        range: hasExplicitRange ? { start, end } : null,
         summary: {
           total_inferences_window: Number(summary?.total_inferences_window || 0),
           email_inferences_window: Number(summary?.email_inferences_window || 0),

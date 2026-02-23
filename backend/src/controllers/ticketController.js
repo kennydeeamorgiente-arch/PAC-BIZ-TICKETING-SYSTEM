@@ -7,6 +7,7 @@ const { sendTicketReply } = require('../services/gmailService');
 const { logAudit, addSystemActivityComment } = require('../services/auditService');
 const { notifyUsers } = require('../services/notificationService');
 const { renderTemplate } = require('../services/emailTemplateService');
+const { getReportSettings } = require('../services/appConfigService');
 const { getStatusModelResponse, getAllowedStatuses, canTransition } = require('../constants/ticketStatusModel');
 const {
   decideTicketPriority,
@@ -19,7 +20,9 @@ const {
 
 const ALLOWED_STATUSES = getAllowedStatuses();
 
-const TICKET_SELECT = `
+function buildTicketSelect(overdueDays = 3) {
+  const safeOverdueDays = Math.max(1, Math.min(30, Number(overdueDays || 3)));
+  return `
   SELECT t.id,
          t.ticket_number,
          t.subject AS title,
@@ -44,16 +47,16 @@ const TICKET_SELECT = `
          t.first_response_at,
          t.resolved_at,
          t.closed_at,
-         DATE_ADD(t.created_at, INTERVAL 3 DAY) AS overdue_after_at,
+         DATE_ADD(t.created_at, INTERVAL ${safeOverdueDays} DAY) AS overdue_after_at,
          CASE
            WHEN ts.status_code NOT IN ('resolved', 'closed', 'deleted')
-             AND t.created_at < DATE_SUB(NOW(), INTERVAL 3 DAY)
+             AND t.created_at < DATE_SUB(NOW(), INTERVAL ${safeOverdueDays} DAY)
            THEN 1
            ELSE 0
          END AS is_overdue,
          CASE
            WHEN ts.status_code NOT IN ('resolved', 'closed', 'deleted')
-             AND t.created_at < DATE_SUB(NOW(), INTERVAL 3 DAY)
+             AND t.created_at < DATE_SUB(NOW(), INTERVAL ${safeOverdueDays} DAY)
            THEN 1
            ELSE 0
          END AS sla_breach,
@@ -69,6 +72,7 @@ const TICKET_SELECT = `
   LEFT JOIN users assignee ON assignee.id = t.assigned_to_user_id
   LEFT JOIN users requester ON requester.id = t.requester_user_id
 `;
+}
 
 function stripHtml(input = '') {
   return String(input).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -118,7 +122,9 @@ async function getStatusId(statusCode, fallback = 'open') {
 }
 
 async function fetchTicketById(ticketId) {
-  const [rows] = await db.query(`${TICKET_SELECT} WHERE t.id = ? AND t.is_deleted = 0`, [ticketId]);
+  const settings = await getReportSettings();
+  const ticketSelect = buildTicketSelect(settings.overdueDays);
+  const [rows] = await db.query(`${ticketSelect} WHERE t.id = ? AND t.is_deleted = 0`, [ticketId]);
   return rows.length > 0 ? rows[0] : null;
 }
 
@@ -217,7 +223,9 @@ function mapStatusToSlaEvent(status) {
 
 const getAllTickets = async (req, res) => {
   try {
-    const [tickets] = await db.query(`${TICKET_SELECT} WHERE t.is_deleted = 0 ORDER BY t.created_at DESC`);
+    const settings = await getReportSettings();
+    const ticketSelect = buildTicketSelect(settings.overdueDays);
+    const [tickets] = await db.query(`${ticketSelect} WHERE t.is_deleted = 0 ORDER BY t.created_at DESC`);
 
     res.json({
       success: true,

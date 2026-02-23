@@ -6,7 +6,14 @@ import { Doughnut } from 'react-chartjs-2';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
-export default function SlaDistributionChart({ rows = [] }) {
+function normalizeThresholds(thresholds = {}) {
+  const healthy = Math.max(1, Math.min(100, Math.round(Number(thresholds?.healthyThreshold || 90))));
+  const monitor = Math.max(0, Math.min(healthy - 1, Math.round(Number(thresholds?.monitorThreshold || 70))));
+  return { healthy, monitor };
+}
+
+export default function SlaDistributionChart({ rows = [], thresholds = {} }) {
+  const { healthy, monitor } = normalizeThresholds(thresholds);
   const distribution = useMemo(() => {
     const output = {
       healthy: 0,
@@ -16,20 +23,25 @@ export default function SlaDistributionChart({ rows = [] }) {
 
     for (const row of rows || []) {
       const sla = Number(row?.slaCompliance || 0);
-      if (sla >= 90) output.healthy += 1;
-      else if (sla >= 70) output.monitor += 1;
+      if (sla >= healthy) output.healthy += 1;
+      else if (sla >= monitor) output.monitor += 1;
       else output.risk += 1;
     }
 
     return output;
-  }, [rows]);
+  }, [rows, healthy, monitor]);
 
   const totalTech = distribution.healthy + distribution.monitor + distribution.risk;
   const hasData = totalTech > 0;
   const bands = [
-    { key: 'healthy', label: 'Healthy (>= 90%)', value: distribution.healthy, tone: 'bg-secondary-100 text-secondary-700' },
-    { key: 'monitor', label: 'Monitor (70-89%)', value: distribution.monitor, tone: 'bg-amber-100 text-amber-700' },
-    { key: 'risk', label: 'At Risk (< 70%)', value: distribution.risk, tone: 'bg-red-100 text-red-700' },
+    { key: 'healthy', label: `Healthy (>= ${healthy}%)`, value: distribution.healthy, tone: 'bg-secondary-100 text-secondary-700' },
+    {
+      key: 'monitor',
+      label: `Monitor (${monitor}%-${Math.max(monitor, healthy - 1)}%)`,
+      value: distribution.monitor,
+      tone: 'bg-amber-100 text-amber-700',
+    },
+    { key: 'risk', label: `At Risk (< ${monitor}%)`, value: distribution.risk, tone: 'bg-red-100 text-red-700' },
   ];
 
   const chartData = {
