@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
@@ -9,6 +10,9 @@ const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const shiftRoutes = require('./routes/shifts');
 const reportRoutes = require('./routes/reports');
+const notificationRoutes = require('./routes/notifications');
+const templateRoutes = require('./routes/templates');
+const aiReviewRoutes = require('./routes/aiReview');
 
 const app = express();
 
@@ -60,12 +64,16 @@ if (process.env.NODE_ENV !== 'development') {
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/tickets', ticketRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/shifts', shiftRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/templates', templateRoutes);
+app.use('/api/ai-review', aiReviewRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({

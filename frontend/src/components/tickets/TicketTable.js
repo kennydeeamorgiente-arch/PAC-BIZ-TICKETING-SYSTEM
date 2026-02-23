@@ -15,38 +15,38 @@ function priorityClasses(priority) {
 
 export default function TicketTable({ tickets }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200 text-sm">
-          <thead className="bg-gray-50">
+        <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-slate-700">
+          <thead className="bg-gray-50 dark:bg-slate-800/80">
             <tr>
-              <th className="px-4 py-3 text-left font-semibold text-gray-600">Ticket</th>
-              <th className="px-4 py-3 text-left font-semibold text-gray-600">Status</th>
-              <th className="px-4 py-3 text-left font-semibold text-gray-600">Priority</th>
-              <th className="px-4 py-3 text-left font-semibold text-gray-600">Assigned To</th>
-              <th className="px-4 py-3 text-left font-semibold text-gray-600">Created</th>
-              <th className="px-4 py-3 text-left font-semibold text-gray-600">Action</th>
+              <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-slate-300">Ticket</th>
+              <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-slate-300">Status</th>
+              <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-slate-300">Priority</th>
+              <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-slate-300">Assigned To</th>
+              <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-slate-300">Created</th>
+              <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-slate-300">Action</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
             {tickets.map((ticket) => (
-              <tr key={ticket.id} className="hover:bg-gray-50">
+              <tr key={ticket.id} className="transition-colors hover:bg-gray-50 dark:hover:bg-slate-800/60">
                 <td className="px-4 py-3">
-                  <div className="font-medium text-gray-900">{ticket.ticket_number || `TKT-${ticket.id}`}</div>
-                  <div className="text-xs text-gray-500">{ticket.title || 'Untitled ticket'}</div>
+                  <div className="font-medium text-gray-900 dark:text-slate-100">{ticket.ticket_number || `TKT-${ticket.id}`}</div>
+                  <div className="text-xs text-gray-500 dark:text-slate-400">{ticket.title || 'Untitled ticket'}</div>
                 </td>
-                <td className="px-4 py-3 capitalize text-gray-700">{ticket.status || 'open'}</td>
+                <td className="px-4 py-3 capitalize text-gray-700 dark:text-slate-300">{ticket.status || 'open'}</td>
                 <td className="px-4 py-3">
                   <span className={`rounded-md px-2 py-0.5 text-xs font-medium capitalize ${priorityClasses(ticket.priority)}`}>
                     {ticket.priority || 'low'}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-gray-700">{ticket.assigned_to_name || 'Unassigned'}</td>
-                <td className="px-4 py-3 text-gray-600">
+                <td className="px-4 py-3 text-gray-700 dark:text-slate-300">{ticket.assigned_to_name || 'Unassigned'}</td>
+                <td className="px-4 py-3 text-gray-600 dark:text-slate-400">
                   {ticket.created_at ? new Date(ticket.created_at).toLocaleString() : 'No date'}
                 </td>
                 <td className="px-4 py-3">
-                  <Link href={`/tickets/${ticket.id}`} className="text-secondary-700 hover:underline">
+                  <Link href={`/tickets/${ticket.id}`} className="text-secondary-700 hover:underline dark:text-secondary-600">
                     Open
                   </Link>
                 </td>
@@ -54,7 +54,7 @@ export default function TicketTable({ tickets }) {
             ))}
             {tickets.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-gray-500">
+                <td colSpan={6} className="px-4 py-6 text-center text-gray-500 dark:text-slate-400">
                   No tickets found.
                 </td>
               </tr>

@@ -1,60 +1,188 @@
 'use client';
 
-import { useState } from 'react';
-import { Search, Bell, Menu } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Bell, Menu, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import ProfileModal from '@/components/profile/ProfileModal';
+import api from '@/lib/api';
 
-export default function Topbar({ onMenuClick }) {
-  const [searchQuery, setSearchQuery] = useState('');
-  const { user } = useAuth();
-  const safeUser = user || {
-    name: 'Demo User',
-    role: 'admin',
+export default function Topbar({ onMenuClick, onToggleCollapse, sidebarCollapsed = false }) {
+  const router = useRouter();
+  const { user, refreshUser } = useAuth();
+  const [notifications, setNotifications] = useState([]);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const panelRef = useRef(null);
+  const safeUser = user || { name: 'User' };
+
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const response = await api.getNotifications(40);
+      const rows = Array.isArray(response?.data) ? response.data : Array.isArray(response) ? response : [];
+      setNotifications(rows);
+    } catch {
+      setNotifications([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    const timerId = setInterval(() => {
+      void fetchNotifications();
+    }, 30000);
+
+    const initialId = setTimeout(() => {
+      void fetchNotifications();
+    }, 0);
+
+    return () => {
+      clearInterval(timerId);
+      clearTimeout(initialId);
+    };
+  }, [fetchNotifications]);
+
+  useEffect(() => {
+    const onClickOutside = (event) => {
+      if (panelRef.current && !panelRef.current.contains(event.target)) {
+        setPanelOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, []);
+
+  const unreadCount = useMemo(
+    () => notifications.filter((item) => !item.read_at).length,
+    [notifications]
+  );
+
+  const markAsRead = async (id) => {
+    const now = new Date().toISOString();
+    const next = notifications.map((item) => (item.id === id ? { ...item, read_at: item.read_at || now } : item));
+    setNotifications(next);
+    try {
+      await api.markNotificationRead(id);
+    } catch {
+      // keep optimistic UI state even if API write fails
+    }
   };
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    console.log('Searching for:', searchQuery);
+  const markAllAsRead = async () => {
+    const now = new Date().toISOString();
+    const next = notifications.map((item) => ({ ...item, read_at: item.read_at || now }));
+    setNotifications(next);
+    try {
+      await api.markAllNotificationsRead();
+    } catch {
+      // keep optimistic UI state even if API write fails
+    }
+  };
+
+  const onNotificationClick = async (item) => {
+    await markAsRead(item.id);
+    setPanelOpen(false);
+    if (item.ticket_id) {
+      router.push(`/tickets/${item.ticket_id}`);
+    }
   };
 
   return (
-    <div className="flex h-16 items-center justify-between border-b border-gray-200 bg-white px-6">
-      <button
-        onClick={onMenuClick}
-        className="rounded-md p-2 text-gray-600 hover:bg-gray-100 lg:hidden"
-      >
-        <Menu className="h-6 w-6" />
-      </button>
+    <div className="flex h-16 items-center justify-between border-b border-gray-200 bg-white px-3 sm:px-4 lg:px-6 dark:border-violet-900/60 dark:bg-slate-950/90">
+      <div className="flex items-center gap-2">
+        <button
+          onClick={onMenuClick}
+          className="rounded-md p-2 text-gray-600 hover:bg-gray-100 dark:text-slate-300 dark:hover:bg-violet-900/40 lg:hidden"
+          aria-label="Open menu"
+        >
+          <Menu className="h-6 w-6" />
+        </button>
+        <button
+          onClick={onToggleCollapse}
+          className="hidden rounded-md p-2 text-gray-600 hover:bg-gray-100 dark:text-slate-300 dark:hover:bg-violet-900/40 lg:inline-flex"
+          aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          {sidebarCollapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
+        </button>
+      </div>
 
-      <form onSubmit={handleSearch} className="max-w-lg flex-1">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 transform text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search tickets..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-secondary-500"
-          />
-        </div>
-      </form>
+      <div className="flex-1" />
 
-      <div className="ml-4 flex items-center space-x-4">
-        <button className="relative rounded-full p-2 text-gray-600 hover:bg-gray-100">
-          <Bell className="h-6 w-6" />
-          <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-danger"></span>
+      <div className="ml-2 flex items-center space-x-2 sm:ml-4 sm:space-x-4">
+        <button
+          type="button"
+          onClick={() => setProfileModalOpen(true)}
+          className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-gray-100 text-sm font-semibold text-gray-700 hover:bg-gray-200 dark:bg-violet-900/35 dark:text-slate-100 dark:hover:bg-violet-900/50 md:hidden"
+          aria-label="Open profile"
+          title="My Profile"
+        >
+          {safeUser.avatar_data ? (
+            <img
+              src={safeUser.avatar_data}
+              alt="Profile avatar"
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            safeUser.name?.charAt(0)?.toUpperCase() || 'U'
+          )}
         </button>
 
-        <div className="hidden items-center space-x-2 rounded-full bg-gray-100 px-3 py-1 md:flex">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary-500 text-sm font-bold text-white">
-            {safeUser.name?.charAt(0)?.toUpperCase()}
-          </div>
-          <div className="text-sm">
-            <div className="font-medium">{safeUser.name}</div>
-            <div className="text-xs capitalize text-gray-500">{safeUser.role}</div>
-          </div>
+        <div ref={panelRef} className="relative">
+          <button
+            onClick={() => setPanelOpen((prev) => !prev)}
+            className="relative rounded-full p-2 text-gray-600 hover:bg-gray-100 dark:text-slate-300 dark:hover:bg-violet-900/40"
+            aria-label="Open notifications"
+          >
+            <Bell className="h-6 w-6" />
+            {unreadCount > 0 ? (
+              <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold text-white">
+                {unreadCount}
+              </span>
+            ) : null}
+          </button>
+
+          {panelOpen ? (
+            <div className="absolute right-0 z-30 mt-2 w-80 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-violet-900/60 dark:bg-slate-900">
+              <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-violet-900/60">
+                <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">Notifications</p>
+                <button
+                  onClick={markAllAsRead}
+                  className="text-xs font-medium text-secondary-700 hover:text-secondary-600"
+                >
+                  Mark all read
+                </button>
+              </div>
+              <div className="max-h-80 overflow-y-auto">
+                {notifications.length === 0 ? (
+                  <p className="px-4 py-6 text-center text-sm text-gray-500 dark:text-slate-400">No notifications</p>
+                ) : (
+                  notifications.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => onNotificationClick(item)}
+                      className={`w-full border-b border-gray-100 px-4 py-3 text-left hover:bg-gray-50 dark:border-violet-900/40 dark:hover:bg-violet-900/25 ${
+                        item.read_at ? 'bg-white dark:bg-slate-900' : 'bg-blue-50/50 dark:bg-violet-950/30'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">{item.title}</p>
+                        {!item.read_at ? <span className="h-2 w-2 rounded-full bg-secondary-500" /> : null}
+                      </div>
+                      <p className="mt-1 text-xs text-gray-600 dark:text-slate-300">{item.message}</p>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
+
+      <ProfileModal
+        open={profileModalOpen}
+        onClose={() => setProfileModalOpen(false)}
+        user={user}
+        onSaved={refreshUser}
+      />
     </div>
   );
 }

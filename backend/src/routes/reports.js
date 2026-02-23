@@ -5,5 +5,6 @@ const { requireAuth } = require('../middleware/auth');
 
 router.get('/shifts', requireAuth, reportController.getShiftReport);
 router.get('/technicians', requireAuth, reportController.getTechnicianPerformance);
+router.get('/ticket-activity', requireAuth, reportController.getTicketActivity);
 
 module.exports = router;

@@ -16,7 +16,7 @@ function formatDuration(ms) {
   return `${h}h ${m}m`;
 }
 
-export default function ShiftTimer({ shiftType = 'AM' }) {
+export default function ShiftTimer({ shiftType = 'AM', className = '' }) {
   const data = useMemo(() => {
     const now = new Date();
     const { start, end, label } = getShiftWindow(shiftType);
@@ -45,20 +45,28 @@ export default function ShiftTimer({ shiftType = 'AM' }) {
   }, [shiftType]);
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-      <div className="flex items-center">
-        <div className="rounded-lg bg-indigo-50 p-2 text-indigo-700">
-          <Clock3 className="h-5 w-5" />
+    <div
+      className={`flex h-full flex-col justify-between rounded-xl border border-gray-200 bg-white p-3 shadow-sm dark:border-violet-900/50 dark:bg-slate-900 ${className}`}
+    >
+      <div>
+        <div className="flex items-center">
+          <div className="rounded-lg bg-indigo-50 p-1.5 text-indigo-700 dark:bg-violet-900/40 dark:text-violet-200">
+            <Clock3 className="h-4.5 w-4.5" />
+          </div>
+          <div className="ml-3">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-slate-100">Current Shift</h3>
+            <p className="text-xs text-gray-500 dark:text-slate-300">{shiftType} Shift</p>
+          </div>
         </div>
-        <div className="ml-3">
-          <h3 className="text-sm font-semibold text-gray-900">Current Shift</h3>
-          <p className="text-xs text-gray-500">{shiftType} Shift</p>
-        </div>
+        <p className="mt-2 text-sm text-gray-600 dark:text-slate-300">{data.label}</p>
       </div>
 
-      <p className="mt-4 text-sm text-gray-600">{data.label}</p>
-      <p className="mt-2 text-2xl font-bold text-gray-900">{data.isInShift ? data.remaining : 'Off Shift'}</p>
-      <p className="mt-1 text-xs text-gray-500">{data.isInShift ? 'Remaining in this shift' : 'Not currently in shift window'}</p>
+      <div>
+        <p className="text-xl font-bold text-gray-900 dark:text-white">{data.isInShift ? data.remaining : 'Off Shift'}</p>
+        <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">
+          {data.isInShift ? 'Remaining in this shift' : 'Not currently in shift window'}
+        </p>
+      </div>
     </div>
   );
 }

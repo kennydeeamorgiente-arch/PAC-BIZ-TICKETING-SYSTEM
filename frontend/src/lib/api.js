@@ -7,6 +7,17 @@ class API {
     this.baseURL = API_URL;
   }
 
+  getAssetUrl(assetPath) {
+    if (!assetPath) return '';
+    if (String(assetPath).startsWith('http://') || String(assetPath).startsWith('https://')) {
+      return assetPath;
+    }
+
+    const cleanPath = String(assetPath).startsWith('/') ? assetPath : `/${assetPath}`;
+    const base = this.baseURL.replace(/\/api\/?$/, '');
+    return `${base}${cleanPath}`;
+  }
+
   getHeaders() {
     const token = Cookies.get('auth_token');
     const headers = {
@@ -110,8 +121,24 @@ class API {
     return this.post('/tickets', data);
   }
 
+  async deleteTicket(id) {
+    return this.delete(`/tickets/${id}`);
+  }
+
   async updateTicketStatus(id, status) {
     return this.patch(`/tickets/${id}/status`, { status });
+  }
+
+  async updateTicketPriority(id, priority, reason = '') {
+    return this.patch(`/tickets/${id}/priority`, { priority, reason });
+  }
+
+  async getTicketPriorityInsights(id) {
+    return this.get(`/tickets/${id}/priority-insights`);
+  }
+
+  async reevaluateTicketPriority(id) {
+    return this.post(`/tickets/${id}/priority/reevaluate`, {});
   }
 
   async assignTicket(id, userId) {
@@ -120,6 +147,25 @@ class API {
 
   async addComment(ticketId, comment) {
     return this.post(`/tickets/${ticketId}/comments`, { comment_text: comment });
+  }
+
+  async getTicketComments(ticketId) {
+    return this.get(`/tickets/${ticketId}/comments`);
+  }
+
+  async addTicketComment(ticketId, commentText, isInternal = false) {
+    if (typeof commentText === 'object' && commentText !== null) {
+      return this.post(`/tickets/${ticketId}/comments`, commentText);
+    }
+
+    return this.post(`/tickets/${ticketId}/comments`, {
+      comment_text: commentText,
+      is_internal: isInternal,
+    });
+  }
+
+  async getTicketStatusModel() {
+    return this.get('/tickets/status-model');
   }
 
   async getUsers() {
@@ -146,12 +192,88 @@ class API {
     return this.get(`/reports/technicians?start=${startDate}&end=${endDate}`);
   }
 
+  async getTicketActivity(startDate, endDate) {
+    return this.get(`/reports/ticket-activity?start=${startDate}&end=${endDate}`);
+  }
+
   async getShifts() {
     return this.get('/shifts');
   }
 
   async updateShift(id, data) {
     return this.patch(`/shifts/${id}`, data);
+  }
+
+  async getNotifications(limit = 30) {
+    return this.get(`/notifications?limit=${limit}`);
+  }
+
+  async markNotificationRead(id) {
+    return this.patch(`/notifications/${id}/read`, {});
+  }
+
+  async markAllNotificationsRead() {
+    return this.patch('/notifications/read-all', {});
+  }
+
+  async getEmailReplyTemplates() {
+    return this.get('/templates/email-replies');
+  }
+
+  async previewEmailReplyTemplate(code, vars = {}) {
+    return this.post('/templates/email-replies/preview', { code, vars });
+  }
+
+  async getAiReviewQueue(status = 'pending', limit = 50, page = 1) {
+    return this.get(
+      `/ai-review/queue?status=${encodeURIComponent(status)}&limit=${encodeURIComponent(limit)}&page=${encodeURIComponent(page)}`
+    );
+  }
+
+  async getAiIntakeQueue({ status = 'new', decision = 'all', limit = 20, page = 1 } = {}) {
+    return this.get(
+      `/ai-review/intake-queue?status=${encodeURIComponent(status)}&decision=${encodeURIComponent(decision)}&limit=${encodeURIComponent(
+        limit
+      )}&page=${encodeURIComponent(page)}`
+    );
+  }
+
+  async getAiReviewMetrics() {
+    return this.get('/ai-review/metrics');
+  }
+
+  async getAiReviewDashboard(days = 30) {
+    return this.get(`/ai-review/dashboard?days=${encodeURIComponent(days)}`);
+  }
+
+  async getAiReviewRecommendations(days = 30) {
+    return this.get(`/ai-review/recommendations?days=${encodeURIComponent(days)}`);
+  }
+
+  async getAiReadiness() {
+    return this.get('/ai-review/readiness');
+  }
+
+  async runAiEmailSync({ dryRun = false, markAsRead } = {}) {
+    const payload = { dry_run: Boolean(dryRun) };
+    if (markAsRead !== undefined) payload.mark_as_read = Boolean(markAsRead);
+    return this.post('/ai-review/email-sync', payload);
+  }
+
+  async reviewAiInference(inferenceId, payload) {
+    return this.patch(`/ai-review/${inferenceId}/review`, payload);
+  }
+
+  async releaseAiIntakeEmail(id) {
+    return this.patch(`/ai-review/intake-queue/${id}/release`, {});
+  }
+
+  async dismissAiIntakeEmail(id) {
+    return this.patch(`/ai-review/intake-queue/${id}/dismiss`, {});
+  }
+
+  async deleteAiIntakeEmail(id) {
+    return this.delete(`/ai-review/intake-queue/${id}`);
   }
 }
 

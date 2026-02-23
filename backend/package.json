@@ -6,7 +6,9 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"No unit tests configured yet\"",
+    "smoke": "node scripts/smoke-test.js",
+    "seed:v2-admin": "node scripts/seed-v2-admin.js"
   },
   "keywords": [],
   "author": "",

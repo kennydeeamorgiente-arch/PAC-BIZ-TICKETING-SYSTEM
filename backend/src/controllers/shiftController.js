@@ -2,7 +2,12 @@ const db = require('../config/database');
 
 const getShifts = async (req, res) => {
   try {
-    const [rows] = await db.query('SELECT id, shift_name, start_time, end_time FROM shifts ORDER BY id ASC');
+    const [rows] = await db.query(`
+      SELECT id, shift_code AS shift_name, shift_code, display_name, start_time, end_time
+      FROM shifts
+      WHERE is_active = 1
+      ORDER BY id ASC
+    `);
     return res.json({ success: true, data: rows });
   } catch (error) {
     console.error('Error fetching shifts:', error);
@@ -21,7 +26,10 @@ const updateShift = async (req, res) => {
 
     await db.query('UPDATE shifts SET start_time = ?, end_time = ? WHERE id = ?', [start_time, end_time, id]);
 
-    const [rows] = await db.query('SELECT id, shift_name, start_time, end_time FROM shifts WHERE id = ?', [id]);
+    const [rows] = await db.query(
+      'SELECT id, shift_code AS shift_name, shift_code, display_name, start_time, end_time FROM shifts WHERE id = ?',
+      [id]
+    );
     if (rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Shift not found' });
     }

@@ -12,9 +12,11 @@ IT TICKETING SYSTEM
 Server Status: Running
 Port: ${PORT}
 Environment: ${process.env.NODE_ENV || 'development'}
-Database: ${process.env.DB_NAME || 'it_ticketing'}
+Database: ${process.env.DB_NAME || 'it_ticketing_v2'}
 `);
 
-    startEmailMonitoring();
+    startEmailMonitoring().catch((error) => {
+        console.error('Failed to start Gmail monitoring:', error?.message || error);
+    });
     startShiftAwareSLAMonitor();
 });

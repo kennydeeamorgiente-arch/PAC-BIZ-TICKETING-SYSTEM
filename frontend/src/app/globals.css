@@ -9,3 +9,102 @@
 body {
   @apply bg-slate-50 text-slate-900;
 }
+
+html.dark {
+  color-scheme: dark;
+}
+
+html.dark body {
+  background-color: rgb(2 6 23);
+  color: rgb(226 232 240);
+}
+
+html.dark .bg-white {
+  background-color: rgb(15 23 42) !important;
+}
+
+html.dark .bg-gray-50 {
+  background-color: rgb(30 41 59) !important;
+}
+
+html.dark .bg-slate-50 {
+  background-color: rgb(2 6 23) !important;
+}
+
+html.dark .text-gray-900 {
+  color: rgb(241 245 249) !important;
+}
+
+html.dark .text-gray-700,
+html.dark .text-gray-600 {
+  color: rgb(203 213 225) !important;
+}
+
+html.dark .text-gray-500,
+html.dark .text-gray-400 {
+  color: rgb(148 163 184) !important;
+}
+
+html.dark .border-gray-200,
+html.dark .border-gray-300,
+html.dark .border-gray-100 {
+  border-color: rgb(51 65 85) !important;
+}
+
+html.dark input,
+html.dark select,
+html.dark textarea {
+  background-color: rgb(15 23 42) !important;
+  color: rgb(226 232 240) !important;
+}
+
+/* Global brand utility overrides for dark mode */
+html.dark .bg-secondary-500 {
+  background-color: rgb(2 128 144) !important;
+}
+
+html.dark .hover\:bg-secondary-600:hover {
+  background-color: rgb(2 115 128) !important;
+}
+
+html.dark .bg-accent-500 {
+  background-color: rgb(2 195 154) !important;
+}
+
+html.dark .border-accent-500 {
+  border-color: rgb(2 176 138) !important;
+}
+
+html.dark .text-secondary-700,
+html.dark .text-secondary-600 {
+  color: rgb(153 246 228) !important;
+}
+
+html.dark .text-primary-700,
+html.dark .text-primary-600,
+html.dark .text-primary-500 {
+  color: rgb(221 214 254) !important;
+}
+
+html.dark .hover\:bg-primary-600:hover,
+html.dark .hover\:bg-primary-700:hover {
+  background-color: rgb(55 48 163) !important;
+}
+
+/* Amber warning palette overrides for dark mode */
+html.dark .bg-amber-50 {
+  background-color: rgb(69 26 3 / 0.35) !important;
+}
+
+html.dark .bg-amber-100 {
+  background-color: rgb(120 53 15 / 0.45) !important;
+}
+
+html.dark .border-amber-200 {
+  border-color: rgb(180 83 9 / 0.65) !important;
+}
+
+html.dark .text-amber-800,
+html.dark .text-amber-900 {
+  color: rgb(253 230 138) !important;
+}

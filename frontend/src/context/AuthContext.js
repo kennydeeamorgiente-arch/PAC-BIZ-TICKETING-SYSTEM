@@ -12,29 +12,39 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  const checkAuth = async () => {
+  const refreshUser = async () => {
     const token = Cookies.get('auth_token');
 
-    if (token) {
-      try {
-        const userData = await api.getCurrentUser();
-        setUser(userData);
-      } catch (error) {
-        console.error('Auth check failed:', error);
-        // Only clear session on explicit auth failure.
-        if (String(error?.message || '').toLowerCase().includes('unauthorized')) {
-          Cookies.remove('auth_token');
-          setUser(null);
-        }
-      }
+    if (!token) {
+      setUser(null);
+      return null;
     }
 
-    setLoading(false);
+    try {
+      const userData = await api.getCurrentUser();
+      setUser(userData);
+      return userData;
+    } catch (error) {
+      console.error('Auth check failed:', error);
+      if (String(error?.message || '').toLowerCase().includes('unauthorized')) {
+        Cookies.remove('auth_token');
+        setUser(null);
+      }
+      throw error;
+    }
   };
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    checkAuth();
+    const run = async () => {
+      try {
+        await refreshUser();
+      } catch {
+        // ignore refresh error during initial bootstrap
+      } finally {
+        setLoading(false);
+      }
+    };
+    run();
   }, []);
 
   const login = async (email, password) => {
@@ -66,7 +76,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

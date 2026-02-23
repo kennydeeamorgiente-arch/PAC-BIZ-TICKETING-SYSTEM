@@ -6,19 +6,13 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import api from '@/lib/api';
 
-const DEFAULT_SHIFTS = [
-  { id: 1, shift_name: 'AM', start_time: '06:00', end_time: '14:00' },
-  { id: 2, shift_name: 'PM', start_time: '14:00', end_time: '22:00' },
-  { id: 3, shift_name: 'GY', start_time: '22:00', end_time: '06:00' },
-];
-
 function toTimeInput(value) {
   if (!value) return '00:00';
   return String(value).slice(0, 5);
 }
 
 export default function AdminShiftsPage() {
-  const [shifts, setShifts] = useState(DEFAULT_SHIFTS);
+  const [shifts, setShifts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState(null);
   const [message, setMessage] = useState('');
@@ -40,11 +34,11 @@ export default function AdminShiftsPage() {
           }))
         );
       } else {
-        setShifts(DEFAULT_SHIFTS);
+        setShifts([]);
       }
-    } catch {
-      setShifts(DEFAULT_SHIFTS);
-      setMessage('Using fallback shifts (backend shifts API not available yet).');
+    } catch (e) {
+      setShifts([]);
+      setMessage(e?.message || 'Failed to load shifts from server.');
     } finally {
       setLoading(false);
     }
@@ -68,27 +62,31 @@ export default function AdminShiftsPage() {
         end_time: shift.end_time,
       });
       setMessage(`${shift.shift_name} shift updated.`);
-    } catch {
-      setMessage(`${shift.shift_name} shift updated locally (fallback mode).`);
+    } catch (e) {
+      setMessage(e?.message || `Failed to update ${shift.shift_name} shift.`);
     } finally {
       setSavingId(null);
     }
   };
 
   return (
-    <ProtectedRoute allowedRoles={['admin']}>
+    <ProtectedRoute allowedRoles={['technician', 'admin']}>
       <DashboardLayout>
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Shift Configuration</h1>
-            <p className="mt-1 text-sm text-gray-500">Manage AM, PM, and GY shift windows used by SLA and assignment rules.</p>
+        <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Shift Configuration</h1>
+              <p className="mt-1 text-sm text-gray-500">Manage AM, PM, and GY shift windows used by SLA and assignment rules.</p>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-2.5">
+              <button
+                onClick={loadShifts}
+                className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              >
+                <RotateCcw className="mr-1 h-4 w-4" /> Reload
+              </button>
+            </div>
           </div>
-          <button
-            onClick={loadShifts}
-            className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-          >
-            <RotateCcw className="mr-1 h-4 w-4" /> Reload
-          </button>
         </div>
 
         {message ? (
@@ -99,6 +97,8 @@ export default function AdminShiftsPage() {
 
         {loading ? (
           <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-sm text-gray-500">Loading shifts...</div>
+        ) : shifts.length === 0 ? (
+          <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-sm text-gray-500">No shifts found.</div>
         ) : (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             {shifts.map((shift) => (
