@@ -1,4 +1,4 @@
-/** @type {import(''tailwindcss'').Config} */
+/** @type {import('tailwindcss').Config} */
 module.exports = {
   darkMode: 'class',
   content: [
@@ -10,28 +10,32 @@ module.exports = {
     extend: {
       colors: {
         primary: {
-          50: "#f0f4ff",
-          100: "#e0e7ff",
-          500: "#1E2761",
-          600: "#1a2256",
-          700: "#161d4a",
+          50: '#f4f7ff',
+          100: '#dde3f5',
+          500: '#1a3daa',
+          600: '#15338f',
+          700: '#10296f',
         },
         secondary: {
-          50: "#e6f9f5",
-          100: "#ccf3eb",
-          500: "#028090",
-          600: "#027380",
-          700: "#016670",
+          50: '#eaf9ec',
+          100: '#cff2d3',
+          500: '#3dbe45',
+          600: '#35a83d',
+          700: '#2c8b33',
         },
         accent: {
-          500: "#02C39A",
-          600: "#02b08a",
+          50: '#e6f6f4',
+          100: '#cdedea',
+          500: '#2a9e8f',
+          600: '#22897c',
+          700: '#1b6f64',
         },
-        warning: "#F59E0B",
-        danger: "#E03131",
+        warning: '#f59e0b',
+        danger: '#e03131',
       },
       fontFamily: {
-        sans: ["Inter", "Arial", "sans-serif"],
+        sans: ['var(--font-plus-jakarta)', 'DM Sans', 'sans-serif'],
+        heading: ['var(--font-montserrat)', 'var(--font-plus-jakarta)', 'sans-serif'],
       },
     },
   },

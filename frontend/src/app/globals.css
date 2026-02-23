@@ -3,95 +3,121 @@
 @tailwind utilities;
 
 :root {
+  --color-primary: #1a3daa;
+  --color-secondary: #3dbe45;
+  --color-accent: #2a9e8f;
+  --color-bg: #ffffff;
+  --color-surface: #f4f7ff;
+  --color-text: #0f1f4d;
+  --color-muted: #6b7ba4;
+  --color-border: #dde3f5;
   color-scheme: light;
 }
 
 body {
-  @apply bg-slate-50 text-slate-900;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-plus-jakarta), 'DM Sans', sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-montserrat), var(--font-plus-jakarta), sans-serif;
+  letter-spacing: -0.01em;
 }
 
 html.dark {
+  --color-primary: #4a7aff;
+  --color-secondary: #56d95a;
+  --color-accent: #3ec9ba;
+  --color-bg: #0a0f1e;
+  --color-surface: #131929;
+  --color-text: #e8eeff;
+  --color-muted: #7a8bb5;
+  --color-border: #1e2a45;
   color-scheme: dark;
 }
 
 html.dark body {
-  background-color: rgb(2 6 23);
-  color: rgb(226 232 240);
+  background-color: var(--color-bg);
+  color: var(--color-text);
 }
 
 html.dark .bg-white {
-  background-color: rgb(15 23 42) !important;
+  background-color: var(--color-surface) !important;
 }
 
 html.dark .bg-gray-50 {
-  background-color: rgb(30 41 59) !important;
+  background-color: color-mix(in srgb, var(--color-surface) 92%, black) !important;
 }
 
 html.dark .bg-slate-50 {
-  background-color: rgb(2 6 23) !important;
+  background-color: var(--color-bg) !important;
 }
 
 html.dark .text-gray-900 {
-  color: rgb(241 245 249) !important;
+  color: var(--color-text) !important;
 }
 
 html.dark .text-gray-700,
 html.dark .text-gray-600 {
-  color: rgb(203 213 225) !important;
+  color: color-mix(in srgb, var(--color-text) 82%, #000 18%) !important;
 }
 
 html.dark .text-gray-500,
 html.dark .text-gray-400 {
-  color: rgb(148 163 184) !important;
+  color: var(--color-muted) !important;
 }
 
 html.dark .border-gray-200,
 html.dark .border-gray-300,
 html.dark .border-gray-100 {
-  border-color: rgb(51 65 85) !important;
+  border-color: var(--color-border) !important;
 }
 
 html.dark input,
 html.dark select,
 html.dark textarea {
-  background-color: rgb(15 23 42) !important;
-  color: rgb(226 232 240) !important;
+  background-color: var(--color-surface) !important;
+  color: var(--color-text) !important;
 }
 
-/* Global brand utility overrides for dark mode */
 html.dark .bg-secondary-500 {
-  background-color: rgb(2 128 144) !important;
+  background-color: var(--color-secondary) !important;
 }
 
 html.dark .hover\:bg-secondary-600:hover {
-  background-color: rgb(2 115 128) !important;
+  background-color: color-mix(in srgb, var(--color-secondary) 88%, #000 12%) !important;
 }
 
 html.dark .bg-accent-500 {
-  background-color: rgb(2 195 154) !important;
+  background-color: var(--color-accent) !important;
 }
 
 html.dark .border-accent-500 {
-  border-color: rgb(2 176 138) !important;
+  border-color: color-mix(in srgb, var(--color-accent) 85%, #000 15%) !important;
 }
 
 html.dark .text-secondary-700,
 html.dark .text-secondary-600 {
-  color: rgb(153 246 228) !important;
+  color: color-mix(in srgb, var(--color-secondary) 75%, white) !important;
 }
 
 html.dark .text-primary-700,
 html.dark .text-primary-600,
 html.dark .text-primary-500 {
-  color: rgb(221 214 254) !important;
+  color: color-mix(in srgb, var(--color-primary) 78%, white) !important;
 }
 
 html.dark .hover\:bg-primary-600:hover,
 html.dark .hover\:bg-primary-700:hover {
-  background-color: rgb(55 48 163) !important;
+  background-color: color-mix(in srgb, var(--color-primary) 85%, #000 15%) !important;
 }
 
-/* Amber warning palette overrides for dark mode */
 html.dark .bg-amber-50 {
   background-color: rgb(69 26 3 / 0.35) !important;
 }

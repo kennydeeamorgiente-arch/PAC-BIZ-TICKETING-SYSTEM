@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { Bot, ShieldCheck, Inbox, BarChart3 } from 'lucide-react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import Button from '@/components/common/Button';
@@ -10,6 +11,8 @@ import api from '@/lib/api';
 import { formatDate } from '@/lib/utils';
 
 const PRIORITIES = ['low', 'medium', 'high', 'critical'];
+const PANEL = 'rounded-2xl border border-gray-200 bg-white p-4 shadow-sm';
+const SOFT_PANEL = 'rounded-xl border border-gray-200 bg-gray-50 p-3';
 
 export default function AiReviewPage() {
   const [queueStatus, setQueueStatus] = useState('pending');
@@ -22,10 +25,8 @@ export default function AiReviewPage() {
   const [intakeLimit, setIntakeLimit] = useState(12);
   const [intakeRows, setIntakeRows] = useState([]);
   const [intakePagination, setIntakePagination] = useState({ total: 0, page: 1, limit: 12, pages: 1 });
-  const [windowDays, setWindowDays] = useState(30);
   const [queueRows, setQueueRows] = useState([]);
   const [metrics, setMetrics] = useState(null);
-  const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [workingId, setWorkingId] = useState(null);
@@ -75,16 +76,6 @@ export default function AiReviewPage() {
     }
   }, [intakeStatus, intakeDecision, intakeLimit, intakePage]);
 
-  const loadDashboard = useCallback(async () => {
-    try {
-      const response = await api.getAiReviewDashboard(windowDays);
-      setDashboard(response?.data || null);
-    } catch (e) {
-      setDashboard(null);
-      setError((prev) => prev || e?.message || 'Failed to load AI dashboard.');
-    }
-  }, [windowDays]);
-
   useEffect(() => {
     loadData();
   }, [loadData]);
@@ -92,10 +83,6 @@ export default function AiReviewPage() {
   useEffect(() => {
     loadIntake();
   }, [loadIntake]);
-
-  useEffect(() => {
-    loadDashboard();
-  }, [loadDashboard]);
 
   const reviewedAgreementLabel = useMemo(() => {
     const rate = Number(metrics?.reviewed_agreement_rate);
@@ -132,7 +119,6 @@ export default function AiReviewPage() {
       await api.releaseAiIntakeEmail(intakeId);
       await loadIntake();
       await loadData();
-      await loadDashboard();
     } catch (e) {
       setError(e?.message || 'Failed to release intake email to ticket.');
     } finally {
@@ -172,9 +158,24 @@ export default function AiReviewPage() {
   return (
     <ProtectedRoute allowedRoles={['technician', 'admin']}>
       <DashboardLayout>
-        <div className="mb-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-          <h1 className="text-2xl font-bold text-gray-900">AI Review Queue</h1>
-          <p className="mt-1 text-sm text-gray-500">Review low-confidence AI decisions and apply final priority safely.</p>
+        <div className={`mb-4 ${PANEL}`}>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h1 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
+                <Bot className="h-6 w-6 text-primary-600" />
+                AI Review Queue
+              </h1>
+              <p className="mt-1 text-sm text-gray-500">Review low-confidence AI decisions and apply final priority safely.</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 font-semibold text-primary-700">
+                Pending: {metrics?.pending_reviews ?? 0}
+              </span>
+              <span className="rounded-full border border-secondary-200 bg-secondary-50 px-2.5 py-1 font-semibold text-secondary-700">
+                Reviewed: {metrics?.reviewed_count ?? 0}
+              </span>
+            </div>
+          </div>
         </div>
 
         {error ? (
@@ -183,148 +184,51 @@ export default function AiReviewPage() {
           </div>
         ) : null}
 
-        <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-4">
-          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="mb-4 grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
+          <div className="rounded-xl border border-primary-100 bg-gradient-to-br from-primary-50/70 to-white p-4 shadow-sm">
             <p className="text-xs uppercase text-gray-500">Total Inferences</p>
             <p className="mt-1 text-2xl font-bold text-gray-900">{metrics?.total_inferences ?? 0}</p>
           </div>
-          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="rounded-xl border border-amber-100 bg-gradient-to-br from-amber-50/70 to-white p-4 shadow-sm">
             <p className="text-xs uppercase text-gray-500">Pending Reviews</p>
             <p className="mt-1 text-2xl font-bold text-gray-900">{metrics?.pending_reviews ?? 0}</p>
           </div>
-          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="rounded-xl border border-secondary-100 bg-gradient-to-br from-secondary-50/70 to-white p-4 shadow-sm">
             <p className="text-xs uppercase text-gray-500">Reviewed</p>
             <p className="mt-1 text-2xl font-bold text-gray-900">{metrics?.reviewed_count ?? 0}</p>
           </div>
-          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="rounded-xl border border-accent-100 bg-gradient-to-br from-accent-50/70 to-white p-4 shadow-sm">
             <p className="text-xs uppercase text-gray-500">Reviewed Agreement</p>
             <p className="mt-1 text-2xl font-bold text-gray-900">{reviewedAgreementLabel}</p>
           </div>
         </div>
 
-        <div className="mb-4 rounded-2xl border border-gray-200 bg-white p-3 shadow-sm">
-          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 p-2.5">
-            <label className="text-xs font-semibold uppercase text-gray-500">Analytics Window</label>
-            <select
-              value={windowDays}
-              onChange={(e) => setWindowDays(Number(e.target.value))}
-              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
-            >
-              <option value={7}>Last 7 days</option>
-              <option value={30}>Last 30 days</option>
-              <option value={90}>Last 90 days</option>
-            </select>
-            <Button type="button" variant="secondary" onClick={loadDashboard}>
-              Refresh Analytics
-            </Button>
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-              <p className="text-xs uppercase text-gray-500">Window Inferences</p>
-              <p className="mt-1 text-lg font-bold text-gray-900">{dashboard?.summary?.total_inferences_window ?? 0}</p>
-            </div>
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-              <p className="text-xs uppercase text-gray-500">Email Inferences</p>
-              <p className="mt-1 text-lg font-bold text-gray-900">{dashboard?.summary?.email_inferences_window ?? 0}</p>
-            </div>
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-              <p className="text-xs uppercase text-gray-500">Override Rate</p>
-              <p className="mt-1 text-lg font-bold text-gray-900">
-                {Number.isFinite(Number(dashboard?.summary?.reviewed_override_rate))
-                  ? `${Math.round(Number(dashboard.summary.reviewed_override_rate) * 100)}%`
-                  : 'N/A'}
+        <div className={`mb-4 ${PANEL}`}>
+          <div className={`flex flex-wrap items-center justify-between gap-2 ${SOFT_PANEL}`}>
+            <div>
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+                <BarChart3 className="h-4 w-4 text-primary-600" />
+                Deep Analytics moved to Reports
+              </h2>
+              <p className="mt-1 text-xs text-gray-600">
+                This page stays focused on AI queue decisions and intake actions. Use Reports for trends and chart-based analysis.
               </p>
             </div>
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-              <p className="text-xs uppercase text-gray-500">Avg Confidence</p>
-              <p className="mt-1 text-lg font-bold text-gray-900">{Math.round(Number(dashboard?.summary?.avg_confidence_window || 0) * 100)}%</p>
-            </div>
+            <Link
+              href="/reports#ai-analytics"
+              className="inline-flex rounded-lg border border-primary-200 bg-primary-50 px-3 py-1.5 text-xs font-semibold text-primary-700 hover:bg-primary-100"
+            >
+              Open AI Analytics
+            </Link>
           </div>
-
-          <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
-            <section className="rounded-lg border border-gray-200 bg-white p-3">
-              <h3 className="mb-2 text-sm font-semibold text-gray-900">Source Quality</h3>
-              {Array.isArray(dashboard?.source_quality) && dashboard.source_quality.length > 0 ? (
-                <div className="space-y-2">
-                  {dashboard.source_quality.map((row) => {
-                    const reviewedCount = Number(row.reviewed_count || 0);
-                    const reviewedAgree = Number(row.reviewed_agree_count || 0);
-                    const reviewedOverride = Number(row.reviewed_override_count || 0);
-                    const agreeRate = reviewedCount > 0 ? Math.round((reviewedAgree / reviewedCount) * 100) : null;
-                    const overrideRate = reviewedCount > 0 ? Math.round((reviewedOverride / reviewedCount) * 100) : null;
-
-                    return (
-                      <div key={row.intake_source} className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-700">
-                        <p className="font-semibold">{row.intake_source}</p>
-                        <p>Total: {row.total} | Needs review: {row.needs_review_count} | Avg conf: {Math.round(Number(row.avg_confidence || 0) * 100)}%</p>
-                        <p>Agreement: {agreeRate === null ? 'N/A' : `${agreeRate}%`} | Overrides: {overrideRate === null ? 'N/A' : `${overrideRate}%`}</p>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-500">No source quality data in selected window.</p>
-              )}
-            </section>
-
-            <section className="rounded-lg border border-gray-200 bg-white p-3">
-              <h3 className="mb-2 text-sm font-semibold text-gray-900">Noise Blocking Outcomes</h3>
-              {Array.isArray(dashboard?.noise_outcomes) && dashboard.noise_outcomes.length > 0 ? (
-                <div className="space-y-2">
-                  {dashboard.noise_outcomes.map((row) => (
-                    <div key={row.decision} className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-700">
-                      <p className="font-semibold">{row.decision}</p>
-                      <p>Total: {row.total} | Avg risk: {Math.round(Number(row.avg_risk_score || 0))}</p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-500">No noise outcome data yet.</p>
-              )}
-            </section>
-          </div>
-
-          <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
-            <section className="rounded-lg border border-gray-200 bg-white p-3">
-              <h3 className="mb-2 text-sm font-semibold text-gray-900">Top Noisy Senders</h3>
-              {Array.isArray(dashboard?.top_noisy_senders) && dashboard.top_noisy_senders.length > 0 ? (
-                <div className="space-y-2">
-                  {dashboard.top_noisy_senders.map((row) => (
-                    <div key={row.from_email} className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-700">
-                      <p className="font-semibold">{row.from_email}</p>
-                      <p>Filtered emails: {row.total}</p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-500">No blocked sender data yet.</p>
-              )}
-            </section>
-
-            <section className="rounded-lg border border-gray-200 bg-white p-3">
-              <h3 className="mb-2 text-sm font-semibold text-gray-900">Weekly Trend</h3>
-              {Array.isArray(dashboard?.weekly_trend) && dashboard.weekly_trend.length > 0 ? (
-                <div className="space-y-2">
-                  {dashboard.weekly_trend.map((row) => (
-                    <div key={row.week_start} className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-700">
-                      <p className="font-semibold">Week of {row.week_start}</p>
-                      <p>Total: {row.total} | Needs review: {row.needs_review_count} | Reviewed: {row.reviewed_count}</p>
-                      <p>Avg confidence: {Math.round(Number(row.avg_confidence || 0) * 100)}%</p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-500">No weekly data in selected window.</p>
-              )}
-            </section>
-          </div>
-
         </div>
 
-        <div className="mb-4 rounded-2xl border border-gray-200 bg-white p-3 shadow-sm">
-          <div className="mb-3 rounded-xl border border-gray-200 bg-gray-50 p-2.5">
-            <h3 className="text-sm font-semibold text-gray-900">Priority Decision Review List</h3>
+        <div className={`mb-4 ${PANEL}`}>
+          <div className={`mb-3 ${SOFT_PANEL}`}>
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+              <ShieldCheck className="h-4 w-4 text-primary-600" />
+              Priority Decision Review List
+            </h3>
             <p className="mt-1 text-xs text-gray-600">
               Each row is an AI priority decision for a ticket. Review confidence and apply final action.
             </p>
@@ -388,8 +292,8 @@ export default function AiReviewPage() {
               const ruleScore = Number(row?.rule_hits?.scoring?.severity_score);
 
               return (
-                <article key={row.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
+                <article key={row.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
+                  <div className="flex flex-wrap items-start justify-between gap-3 border-b border-gray-100 pb-2">
                     <div>
                       <p className="text-sm font-semibold text-gray-900">
                         {row.ticket_number}: {row.ticket_subject}
@@ -407,22 +311,22 @@ export default function AiReviewPage() {
                   </div>
 
                   <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-4">
-                    <div className="rounded-lg bg-gray-50 p-3">
+                    <div className={SOFT_PANEL}>
                       <p className="text-xs uppercase text-gray-500">Current Ticket Priority</p>
                       <p className="mt-1 text-sm font-semibold text-gray-900">{row.ticket_current_priority || 'N/A'}</p>
                     </div>
-                    <div className="rounded-lg bg-gray-50 p-3">
+                    <div className={SOFT_PANEL}>
                       <p className="text-xs uppercase text-gray-500">Confidence</p>
                       <p className="mt-1 text-sm font-semibold text-gray-900">{Math.round(Number(row.confidence || 0) * 100)}%</p>
                       {Number.isFinite(ruleScore) ? (
                         <p className="mt-1 text-[11px] text-gray-500">Rule score: {Math.round(ruleScore)}</p>
                       ) : null}
                     </div>
-                    <div className="rounded-lg bg-gray-50 p-3">
+                    <div className={SOFT_PANEL}>
                       <p className="text-xs uppercase text-gray-500">Created</p>
                       <p className="mt-1 text-sm font-semibold text-gray-900">{formatDate(row.created_at)}</p>
                     </div>
-                    <div className="rounded-lg bg-gray-50 p-3">
+                    <div className={SOFT_PANEL}>
                       <p className="text-xs uppercase text-gray-500">Review State</p>
                       <p className="mt-1 text-sm font-semibold text-gray-900">
                         {isPending ? 'Pending' : `Reviewed${row.reviewed_by_name ? ` by ${row.reviewed_by_name}` : ''}`}
@@ -460,7 +364,7 @@ export default function AiReviewPage() {
                   ) : null}
 
                   {showOverride ? (
-                    <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
                       <div className="grid grid-cols-1 gap-2 lg:grid-cols-3">
                         <select
                           value={overrideForm.priorityCode}
@@ -507,9 +411,12 @@ export default function AiReviewPage() {
           </div>
         )}
 
-        <div className="mb-4 mt-5 rounded-2xl border border-gray-200 bg-white p-3 shadow-sm">
-          <div className="mb-3 rounded-xl border border-gray-200 bg-gray-50 p-2.5">
-            <h3 className="mb-2 text-sm font-semibold text-gray-900">Email Intake Review (Filtered Emails)</h3>
+        <div className={`mb-4 mt-5 ${PANEL}`}>
+          <div className={`mb-3 ${SOFT_PANEL}`}>
+            <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-900">
+              <Inbox className="h-4 w-4 text-accent-600" />
+              Email Intake Review (Filtered Emails)
+            </h3>
             <div className="grid grid-cols-1 gap-2 lg:grid-cols-12">
               <select
                 value={intakeStatus}
@@ -577,7 +484,7 @@ export default function AiReviewPage() {
                 const isWorking = Number(workingIntakeId) === Number(row.id);
                 const primaryReason = Array.isArray(row.reasons) && row.reasons.length > 0 ? row.reasons[0] : 'No reason logged';
                 return (
-                  <article key={row.id} className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                  <article key={row.id} className="rounded-xl border border-gray-200 bg-gray-50 p-3 transition-shadow hover:shadow-sm">
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div>
                         <p className="text-sm font-semibold text-gray-900">{row.subject}</p>

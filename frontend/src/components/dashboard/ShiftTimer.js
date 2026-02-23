@@ -46,11 +46,11 @@ export default function ShiftTimer({ shiftType = 'AM', className = '' }) {
 
   return (
     <div
-      className={`flex h-full flex-col justify-between rounded-xl border border-gray-200 bg-white p-3 shadow-sm dark:border-violet-900/50 dark:bg-slate-900 ${className}`}
+      className={`flex h-full flex-col justify-between rounded-xl border border-gray-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900 ${className}`}
     >
       <div>
         <div className="flex items-center">
-          <div className="rounded-lg bg-indigo-50 p-1.5 text-indigo-700 dark:bg-violet-900/40 dark:text-violet-200">
+          <div className="rounded-lg bg-primary-50 p-1.5 text-primary-700 dark:bg-primary-900/35 dark:text-primary-200">
             <Clock3 className="h-4.5 w-4.5" />
           </div>
           <div className="ml-3">

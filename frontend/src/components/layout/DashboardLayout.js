@@ -46,7 +46,7 @@ export default function DashboardLayout({ children }) {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-slate-900">
+    <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-slate-950">
       <div className="fixed inset-y-0 left-0 hidden lg:block">
         <Sidebar collapsed={sidebarCollapsed} />
       </div>

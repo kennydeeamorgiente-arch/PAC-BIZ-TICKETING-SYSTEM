@@ -2,14 +2,14 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Ticket, CircleDot, ShieldCheck, AlertCircle, TriangleAlert } from 'lucide-react';
+import { ArrowRight, Ticket, CircleDot, ShieldCheck, AlertCircle, TriangleAlert } from 'lucide-react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import StatsCard from '@/components/dashboard/StatsCard';
 import ShiftTimer from '@/components/dashboard/ShiftTimer';
 import RecentActivity from '@/components/dashboard/RecentActivity';
-import OperationsBoard from '@/components/dashboard/OperationsBoard';
 import TicketActivityChart from '@/components/dashboard/TicketActivityChart';
+import StatusBreakdownChart from '@/components/dashboard/StatusBreakdownChart';
 import { useAuth } from '@/context/AuthContext';
 import { useTickets } from '@/hooks/useTickets';
 import { useRealtime } from '@/hooks/useRealtime';
@@ -22,19 +22,12 @@ function toDateInputValue(date) {
   return `${d.getFullYear()}-${mm}-${dd}`;
 }
 
-function toSafeTimestamp(value) {
-  const ts = new Date(value).getTime();
-  return Number.isFinite(ts) ? ts : null;
-}
-
-function formatAverageMinutes(minutesValue) {
-  const minutes = Number(minutesValue || 0);
-  if (!Number.isFinite(minutes) || minutes <= 0) return '--';
-  const rounded = Math.round(minutes);
-  const h = Math.floor(rounded / 60);
-  const m = rounded % 60;
-  if (h <= 0) return `${m}m`;
-  return `${h}h ${m}m`;
+function formatRangeLabel(startDate, endDate) {
+  const start = new Date(`${startDate}T00:00:00`);
+  const end = new Date(`${endDate}T00:00:00`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 'Selected range';
+  const options = { month: 'short', day: '2-digit', year: 'numeric' };
+  return `${start.toLocaleDateString('en-US', options)} - ${end.toLocaleDateString('en-US', options)}`;
 }
 
 export default function DashboardPage() {
@@ -145,73 +138,60 @@ export default function DashboardPage() {
     [filteredTickets]
   );
 
-  const supportTableRows = useMemo(() => {
-    const map = new Map();
-    for (const ticket of filteredTickets) {
-      const key = ticket.assigned_to_name || 'Unassigned';
-      if (!map.has(key)) {
-        map.set(key, {
-          name: key,
-          open: 0,
-          in_progress: 0,
-          reopened: 0,
-          resolved: 0,
-          closed: 0,
-          total: 0,
-          response_total_minutes: 0,
-          response_count: 0,
-          service_total_minutes: 0,
-          service_count: 0,
-        });
-      }
-      const row = map.get(key);
-      const status = String(ticket.status || 'open').toLowerCase();
-      if (status === 'open' || status === 'new') row.open += 1;
-      else if (status === 'in_progress') row.in_progress += 1;
-      else if (status === 'reopened') row.reopened += 1;
-      else if (status === 'resolved') row.resolved += 1;
-      else if (status === 'closed') row.closed += 1;
-      row.total += 1;
+  const overviewInsights = useMemo(() => {
+    const resolved = filteredTickets.filter((t) => ['resolved', 'closed'].includes(String(t.status || '').toLowerCase())).length;
+    const reopened = filteredTickets.filter((t) => String(t.status || '').toLowerCase() === 'reopened').length;
+    const unresolved = filteredTickets.length - resolved;
+    const closureRate = filteredTickets.length > 0 ? Math.round((resolved / filteredTickets.length) * 100) : 0;
 
-      const createdTs = toSafeTimestamp(ticket.created_at);
-      const firstResponseTs = toSafeTimestamp(ticket.first_response_at);
-      if (createdTs && firstResponseTs && firstResponseTs >= createdTs) {
-        row.response_total_minutes += (firstResponseTs - createdTs) / 60000;
-        row.response_count += 1;
-      }
-
-      if (status === 'resolved' || status === 'closed') {
-        const endTs = toSafeTimestamp(ticket.resolved_at) || toSafeTimestamp(ticket.closed_at);
-        if (createdTs && endTs && endTs >= createdTs) {
-          row.service_total_minutes += (endTs - createdTs) / 60000;
-          row.service_count += 1;
-        }
-      }
-    }
-
-    return [...map.values()]
-      .map((row) => ({
-        ...row,
-        avg_response_minutes: row.response_count > 0 ? row.response_total_minutes / row.response_count : null,
-        avg_service_minutes: row.service_count > 0 ? row.service_total_minutes / row.service_count : null,
-      }))
-      .sort((a, b) => b.total - a.total);
+    return {
+      resolved,
+      reopened,
+      unresolved,
+      closureRate,
+    };
   }, [filteredTickets]);
+
+  const rangeLabel = useMemo(() => formatRangeLabel(startDate, endDate), [startDate, endDate]);
+  const liveUpdatedLabel = new Date().toLocaleString('en-US', {
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 
   return (
     <ProtectedRoute allowedRoles={['technician', 'admin']}>
       <DashboardLayout>
         <section className="space-y-3">
           <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-            <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-            <p className="mt-1 text-sm text-gray-500">
-              Welcome back{user?.name ? `, ${user.name}` : ''}. Here is your current support overview.
-            </p>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">Dashboard Overview</h1>
+                <p className="mt-1 text-sm text-gray-500">
+                  Welcome back{user?.name ? `, ${user.name}` : ''}. Quick, clear view of queue health and live operations.
+                </p>
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                  <span className="rounded-full border border-gray-300 bg-gray-50 px-2.5 py-1 text-gray-700">{rangeLabel}</span>
+                  <span className="rounded-full border border-accent-200 bg-accent-50 px-2.5 py-1 text-accent-700 dark:border-accent-700 dark:bg-accent-900/35 dark:text-accent-200">
+                    Auto refresh: 15s
+                  </span>
+                  <span className="rounded-full border border-gray-300 bg-gray-50 px-2.5 py-1 text-gray-700">Updated: {liveUpdatedLabel}</span>
+                </div>
+              </div>
+              <Link
+                href="/reports"
+                className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+              >
+                Deep Reports
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
           </div>
 
           <div className="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm">
             <div className="grid grid-cols-1 gap-2 lg:grid-cols-[auto_minmax(0,1fr)] lg:items-center">
-              <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Report Timeframe</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Dashboard Timeframe</div>
               <div className="flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-2.5 py-2">
                 <select
                   value={rangePreset}
@@ -276,74 +256,56 @@ export default function DashboardPage() {
             </div>
           ) : null}
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
-            <StatsCard title="Total Tickets" value={metrics.total} subtitle="Across all statuses" trend={8} icon={Ticket} tone="primary" />
-            <StatsCard title="Open Tickets" value={metrics.open} subtitle="Need immediate action" trend={-4} icon={CircleDot} tone="warning" />
-            <StatsCard title="In Progress" value={metrics.inProgress} subtitle="Actively being worked" trend={6} icon={AlertCircle} tone="secondary" />
-            <StatsCard title="Overdue" value={metrics.overdue} subtitle="SLA breached unresolved" trend={3} icon={TriangleAlert} tone="warning" />
-            <StatsCard title="SLA Compliance" value={`${metrics.compliance}%`} subtitle="Within SLA target" trend={5} icon={ShieldCheck} tone="secondary" className="sm:col-span-2 lg:col-span-3 2xl:col-span-1" />
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(210px,1fr))] gap-3">
+            <StatsCard title="Total Tickets" value={metrics.total} subtitle="Within selected timeframe" trend={null} icon={Ticket} tone="primary" />
+            <StatsCard title="Open Tickets" value={metrics.open} subtitle="Waiting for action" trend={null} icon={CircleDot} tone="warning" />
+            <StatsCard title="In Progress" value={metrics.inProgress} subtitle="Currently being handled" trend={null} icon={AlertCircle} tone="secondary" />
+            <StatsCard title="Overdue" value={metrics.overdue} subtitle="Past SLA threshold" trend={null} icon={TriangleAlert} tone="warning" />
+            <StatsCard title="Resolution Rate" value={`${metrics.compliance}%`} subtitle="Resolved + closed share" trend={null} icon={ShieldCheck} tone="secondary" />
           </div>
 
-          <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-3">
-            <div className="lg:col-span-1 self-start">
-              <ShiftTimer shiftType={user?.shift_type || 'AM'} className="h-[190px] min-h-[190px] max-h-[190px]" />
+          <div className="grid grid-cols-1 gap-3 xl:grid-cols-12">
+            <div className="xl:col-span-8">
+              <TicketActivityChart startDate={startDate} endDate={endDate} refreshKey={activityRefreshKey} />
             </div>
-            <div className="lg:col-span-2 self-start">
-              <RecentActivity items={activityItems} className="h-[190px] min-h-[190px] max-h-[190px]" />
+            <div className="space-y-3 xl:col-span-4">
+              <StatusBreakdownChart tickets={filteredTickets} />
+              <ShiftTimer shiftType={user?.shift_type || 'AM'} className="h-[170px] min-h-[170px] max-h-[170px]" />
             </div>
           </div>
 
-          <TicketActivityChart startDate={startDate} endDate={endDate} refreshKey={activityRefreshKey} />
-
-          <OperationsBoard tickets={filteredTickets} />
-
-          <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-gray-900">IT Support Workload</h3>
-              <Link href="/tickets" className="text-xs font-semibold text-secondary-700 hover:underline">
-                View all tickets
-              </Link>
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+            <div className="lg:col-span-2">
+              <RecentActivity items={activityItems} className="h-[230px] min-h-[230px] max-h-[230px] w-full" />
             </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 text-sm">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-600">IT Support</th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-600">Open</th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-600">In Progress</th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-600">Reopened</th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-600">Resolved</th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-600">Closed</th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-600">Service Time</th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-600">Response Time</th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-600">Total</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {supportTableRows.map((row) => (
-                    <tr key={row.name}>
-                      <td className="px-3 py-2 font-medium text-gray-900">{row.name}</td>
-                      <td className="px-3 py-2 text-gray-700">{row.open}</td>
-                      <td className="px-3 py-2 text-gray-700">{row.in_progress}</td>
-                      <td className="px-3 py-2 text-gray-700">{row.reopened}</td>
-                      <td className="px-3 py-2 text-gray-700">{row.resolved}</td>
-                      <td className="px-3 py-2 text-gray-700">{row.closed}</td>
-                      <td className="px-3 py-2 text-gray-700">{formatAverageMinutes(row.avg_service_minutes)}</td>
-                      <td className="px-3 py-2 text-gray-700">{formatAverageMinutes(row.avg_response_minutes)}</td>
-                      <td className="px-3 py-2 text-gray-900">{row.total}</td>
-                    </tr>
-                  ))}
-                  {supportTableRows.length === 0 ? (
-                    <tr>
-                      <td colSpan={9} className="px-3 py-4 text-center text-gray-500">
-                        No workload data in selected range.
-                      </td>
-                    </tr>
-                  ) : null}
-                </tbody>
-              </table>
+            <div className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+              <h3 className="text-sm font-semibold text-gray-900">Action Center</h3>
+              <p className="mt-1 text-xs text-gray-500">Simple guidance to keep the queue healthy.</p>
+              <div className="mt-2 space-y-2 text-xs text-gray-700">
+                <div className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-2">
+                  <p className="text-[11px] uppercase tracking-wide text-gray-500">Queue Health</p>
+                  <p className="mt-1 font-semibold text-gray-900">
+                    {overviewInsights.closureRate >= 85 ? 'Healthy flow' : 'Needs attention'}
+                  </p>
+                  <p className="text-[11px] text-gray-600">Closure rate {overviewInsights.closureRate}% | Unresolved {overviewInsights.unresolved}</p>
+                </div>
+                <div className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-2">
+                  <p className="text-[11px] uppercase tracking-wide text-gray-500">Risk Signal</p>
+                  <p className="mt-1 font-semibold text-gray-900">
+                    {metrics.overdue > 0 ? `${metrics.overdue} overdue tickets require attention` : 'No overdue tickets in current range'}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-2">
+                  <p className="text-[11px] uppercase tracking-wide text-gray-500">Reopened</p>
+                  <p className="mt-1 font-semibold text-gray-900">{overviewInsights.reopened} tickets reopened</p>
+                </div>
+                <Link href="/tickets" className="inline-flex items-center gap-1 pt-1 font-semibold text-secondary-700 hover:underline">
+                  Open Ticket Queue
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
             </div>
-          </section>
+          </div>
         </section>
       </DashboardLayout>
     </ProtectedRoute>

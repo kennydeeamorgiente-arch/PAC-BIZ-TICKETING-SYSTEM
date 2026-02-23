@@ -87,18 +87,18 @@ export default function Topbar({ onMenuClick, onToggleCollapse, sidebarCollapsed
   };
 
   return (
-    <div className="flex h-16 items-center justify-between border-b border-gray-200 bg-white px-3 sm:px-4 lg:px-6 dark:border-violet-900/60 dark:bg-slate-950/90">
+    <div className="flex h-16 items-center justify-between border-b border-gray-200 bg-white px-3 sm:px-4 lg:px-6 dark:border-primary-700 dark:bg-slate-900/95">
       <div className="flex items-center gap-2">
         <button
           onClick={onMenuClick}
-          className="rounded-md p-2 text-gray-600 hover:bg-gray-100 dark:text-slate-300 dark:hover:bg-violet-900/40 lg:hidden"
+          className="rounded-md p-2 text-gray-600 hover:bg-gray-100 dark:text-slate-300 dark:hover:bg-primary-700/60 lg:hidden"
           aria-label="Open menu"
         >
           <Menu className="h-6 w-6" />
         </button>
         <button
           onClick={onToggleCollapse}
-          className="hidden rounded-md p-2 text-gray-600 hover:bg-gray-100 dark:text-slate-300 dark:hover:bg-violet-900/40 lg:inline-flex"
+          className="hidden rounded-md p-2 text-gray-600 hover:bg-gray-100 dark:text-slate-300 dark:hover:bg-primary-700/60 lg:inline-flex"
           aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
           {sidebarCollapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
@@ -111,7 +111,7 @@ export default function Topbar({ onMenuClick, onToggleCollapse, sidebarCollapsed
         <button
           type="button"
           onClick={() => setProfileModalOpen(true)}
-          className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-gray-100 text-sm font-semibold text-gray-700 hover:bg-gray-200 dark:bg-violet-900/35 dark:text-slate-100 dark:hover:bg-violet-900/50 md:hidden"
+          className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-gray-100 text-sm font-semibold text-gray-700 hover:bg-gray-200 dark:bg-primary-700/40 dark:text-slate-100 dark:hover:bg-primary-700/60 md:hidden"
           aria-label="Open profile"
           title="My Profile"
         >
@@ -129,7 +129,7 @@ export default function Topbar({ onMenuClick, onToggleCollapse, sidebarCollapsed
         <div ref={panelRef} className="relative">
           <button
             onClick={() => setPanelOpen((prev) => !prev)}
-            className="relative rounded-full p-2 text-gray-600 hover:bg-gray-100 dark:text-slate-300 dark:hover:bg-violet-900/40"
+            className="relative rounded-full p-2 text-gray-600 hover:bg-gray-100 dark:text-slate-300 dark:hover:bg-primary-700/60"
             aria-label="Open notifications"
           >
             <Bell className="h-6 w-6" />
@@ -141,8 +141,8 @@ export default function Topbar({ onMenuClick, onToggleCollapse, sidebarCollapsed
           </button>
 
           {panelOpen ? (
-            <div className="absolute right-0 z-30 mt-2 w-80 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-violet-900/60 dark:bg-slate-900">
-              <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-violet-900/60">
+            <div className="absolute right-0 z-30 mt-2 w-80 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-primary-700 dark:bg-slate-900">
+              <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-primary-700">
                 <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">Notifications</p>
                 <button
                   onClick={markAllAsRead}
@@ -159,8 +159,8 @@ export default function Topbar({ onMenuClick, onToggleCollapse, sidebarCollapsed
                     <button
                       key={item.id}
                       onClick={() => onNotificationClick(item)}
-                      className={`w-full border-b border-gray-100 px-4 py-3 text-left hover:bg-gray-50 dark:border-violet-900/40 dark:hover:bg-violet-900/25 ${
-                        item.read_at ? 'bg-white dark:bg-slate-900' : 'bg-blue-50/50 dark:bg-violet-950/30'
+                      className={`w-full border-b border-gray-100 px-4 py-3 text-left hover:bg-gray-50 dark:border-primary-800 dark:hover:bg-primary-900/30 ${
+                        item.read_at ? 'bg-white dark:bg-slate-900' : 'bg-blue-50/50 dark:bg-primary-900/35'
                       }`}
                     >
                       <div className="flex items-center justify-between gap-2">

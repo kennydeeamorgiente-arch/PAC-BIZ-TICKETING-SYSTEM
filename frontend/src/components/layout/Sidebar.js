@@ -71,17 +71,17 @@ export default function Sidebar({ collapsed = false }) {
   const allowedNav = navigation.filter((item) => item.roles.includes(normalizedRole));
 
   return (
-    <div className={`flex h-full flex-col bg-primary-500 text-white transition-all duration-300 dark:bg-gradient-to-b dark:from-violet-950 dark:via-indigo-950 dark:to-slate-950 ${collapsed ? 'w-20' : 'w-64'}`}>
-      <div className={`border-b border-primary-600 dark:border-violet-900/70 ${collapsed ? 'p-3' : 'p-6'}`}>
+    <div className={`flex h-full flex-col bg-primary-500 text-white transition-all duration-300 dark:bg-primary-700 ${collapsed ? 'w-20' : 'w-64'}`}>
+      <div className={`border-b border-primary-600 dark:border-primary-600 ${collapsed ? 'p-3' : 'p-6'}`}>
         <div className="flex items-center">
           {collapsed ? (
-            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-primary-700 text-sm font-bold dark:bg-violet-900/60">
+            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-primary-700 text-sm font-bold dark:bg-primary-600">
               IT
             </div>
           ) : (
             <div>
               <h1 className="text-xl font-bold">IT Ticketing</h1>
-              <p className="mt-1 text-xs text-gray-300 dark:text-violet-200/70">Pac Biz</p>
+              <p className="mt-1 text-xs text-gray-300 dark:text-blue-100/80">Pac Biz</p>
             </div>
           )}
         </div>
@@ -101,8 +101,8 @@ export default function Sidebar({ collapsed = false }) {
               title={collapsed ? item.name : ''}
               className={`flex items-center py-3 text-sm font-medium transition-colors duration-200 ${
                 isActive
-                  ? `border-l-4 border-accent-500 bg-primary-700 text-white dark:bg-violet-900/70 dark:text-violet-50 ${collapsed ? 'justify-center px-0' : 'px-6'}`
-                  : 'text-gray-300 hover:bg-primary-600 hover:text-white dark:text-violet-200/80 dark:hover:bg-violet-900/40 dark:hover:text-violet-50'
+                  ? `border-l-4 border-accent-500 bg-primary-700 text-white dark:bg-primary-600 dark:text-white ${collapsed ? 'justify-center px-0' : 'px-6'}`
+                  : 'text-gray-300 hover:bg-primary-600 hover:text-white dark:text-blue-100/80 dark:hover:bg-primary-600 dark:hover:text-white'
               } ${!isActive && (collapsed ? 'justify-center px-0' : 'px-6')
               }`}
             >
@@ -113,19 +113,19 @@ export default function Sidebar({ collapsed = false }) {
         })}
       </nav>
 
-      <div className={`border-t border-primary-600 bg-primary-600 dark:border-violet-900/70 dark:bg-violet-950/70 ${collapsed ? 'p-3' : 'p-4'}`}>
+      <div className={`border-t border-primary-600 bg-primary-600 dark:border-primary-600 dark:bg-primary-600 ${collapsed ? 'p-3' : 'p-4'}`}>
         {collapsed ? (
           <div className="flex justify-center">
-            <Clock className="h-5 w-5 text-violet-200/90" />
+            <Clock className="h-5 w-5 text-blue-100/90" />
           </div>
         ) : (
           <>
-            <div className="mb-2 flex items-center text-xs text-gray-300 dark:text-violet-200/80">
+            <div className="mb-2 flex items-center text-xs text-gray-300 dark:text-blue-100/80">
               <Clock className="mr-2 h-4 w-4" />
               Current Shift
             </div>
             <div className="text-sm font-semibold">{safeUser.shift_type} SHIFT</div>
-            <div className="mt-1 text-xs text-gray-400 dark:text-violet-300/60">
+            <div className="mt-1 text-xs text-gray-400 dark:text-blue-100/70">
               {safeUser.shift_type === 'AM' && '6:00 AM - 2:00 PM'}
               {safeUser.shift_type === 'PM' && '2:00 PM - 10:00 PM'}
               {safeUser.shift_type === 'GY' && '10:00 PM - 6:00 AM'}
@@ -134,12 +134,12 @@ export default function Sidebar({ collapsed = false }) {
         )}
       </div>
 
-      <div className={`border-t border-primary-600 dark:border-violet-900/70 ${collapsed ? 'p-3' : 'p-4'}`}>
+      <div className={`border-t border-primary-600 dark:border-primary-600 ${collapsed ? 'p-3' : 'p-4'}`}>
         <button
           type="button"
           onClick={() => setProfileModalOpen(true)}
           title={collapsed ? 'My Profile' : ''}
-          className={`mb-3 flex w-full rounded px-2 py-1.5 text-left transition-colors hover:bg-primary-600 dark:hover:bg-violet-900/40 ${
+          className={`mb-3 flex w-full rounded px-2 py-1.5 text-left transition-colors hover:bg-primary-600 dark:hover:bg-primary-600 ${
             collapsed ? 'justify-center' : 'items-center'
           }`}
         >
@@ -164,7 +164,7 @@ export default function Sidebar({ collapsed = false }) {
         <button
           onClick={() => logout?.()}
           title={collapsed ? 'Logout' : ''}
-          className={`flex w-full items-center rounded px-3 py-2 text-sm text-gray-300 transition-colors hover:bg-primary-600 dark:text-violet-200/80 dark:hover:bg-violet-900/40 ${collapsed ? 'justify-center' : ''}`}
+          className={`flex w-full items-center rounded px-3 py-2 text-sm text-gray-300 transition-colors hover:bg-primary-600 dark:text-blue-100/80 dark:hover:bg-primary-600 ${collapsed ? 'justify-center' : ''}`}
         >
           <LogOut className={`h-4 w-4 ${collapsed ? '' : 'mr-2'}`} />
           {!collapsed ? 'Logout' : null}

@@ -1,12 +1,25 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { CheckCircle2, Gauge, TicketCheck, TriangleAlert } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import ShiftComparison from '@/components/reports/ShiftComparison';
-import TechnicianLeaderboard from '@/components/reports/TechnicianLeaderboard';
+import ReportStatCard from '@/components/reports/ReportStatCard';
+import TicketFlowTrend from '@/components/reports/TicketFlowTrend';
+import SlaDistributionChart from '@/components/reports/SlaDistributionChart';
+import TechnicianSlaChart from '@/components/reports/TechnicianSlaChart';
+import AiReviewAnalyticsPanel from '@/components/ai-review/AiReviewAnalyticsPanel';
 import api from '@/lib/api';
+
+const EMPTY_ACTIVITY_SERIES = {
+  created: [],
+  closed: [],
+  reopened: [],
+  overdue: [],
+  collab: [],
+};
 
 function toDateInputValue(date) {
   const d = new Date(date);
@@ -15,51 +28,72 @@ function toDateInputValue(date) {
   return `${d.getFullYear()}-${mm}-${dd}`;
 }
 
+function sumSeriesTotals(rows = []) {
+  return (rows || []).reduce((sum, row) => sum + Number(row?.total || 0), 0);
+}
+
+function formatMinutesToHuman(minutesValue) {
+  const minutes = Math.max(0, Math.round(Number(minutesValue || 0)));
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (hours <= 0) return `${mins} mins`;
+  return `${hours}h ${mins}m`;
+}
+
 export default function ReportsPage() {
   const [rangePreset, setRangePreset] = useState('7');
   const [startDate, setStartDate] = useState(toDateInputValue(new Date(Date.now() - 7 * 86400000)));
   const [endDate, setEndDate] = useState(toDateInputValue(new Date()));
   const [shiftRows, setShiftRows] = useState([]);
   const [techRows, setTechRows] = useState([]);
+  const [activitySeries, setActivitySeries] = useState(EMPTY_ACTIVITY_SERIES);
+  const [aiInsights, setAiInsights] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [aiInsights, setAiInsights] = useState(null);
 
-  const loadReports = async () => {
+  const derivedWindowDays = useMemo(() => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 30;
+    const diffMs = Math.abs(end.getTime() - start.getTime());
+    const diffDays = Math.floor(diffMs / 86400000) + 1;
+    return Math.max(7, Math.min(365, diffDays));
+  }, [startDate, endDate]);
+
+  const loadReports = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const startTs = new Date(startDate).getTime();
-      const endTs = new Date(endDate).getTime();
-      const dayMs = 86400000;
-      const derivedDays = Math.max(7, Math.min(365, Math.ceil((Math.max(endTs, startTs) - Math.min(endTs, startTs) + dayMs) / dayMs)));
-
-      const [shifts, techs, aiData] = await Promise.all([
+      const [shifts, techs, activity, aiDashboard] = await Promise.all([
         api.getShiftReport(startDate, endDate),
         api.getTechnicianPerformance(startDate, endDate),
-        api.getAiReviewDashboard(derivedDays).catch(() => null),
+        api.getTicketActivity(startDate, endDate).catch(() => null),
+        api.getAiReviewDashboard(derivedWindowDays).catch(() => null),
       ]);
 
       const shiftData = shifts?.data || shifts || [];
       const techData = techs?.data || techs || [];
+      const activityData = activity?.data?.series || EMPTY_ACTIVITY_SERIES;
+      const aiData = aiDashboard?.data || null;
 
       setShiftRows(Array.isArray(shiftData) ? shiftData : []);
       setTechRows(Array.isArray(techData) ? techData : []);
-      setAiInsights(aiData?.data || null);
+      setActivitySeries(activityData);
+      setAiInsights(aiData);
     } catch (e) {
       setShiftRows([]);
       setTechRows([]);
+      setActivitySeries(EMPTY_ACTIVITY_SERIES);
       setAiInsights(null);
       setError(e?.message || 'Failed to load reports from server.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [startDate, endDate, derivedWindowDays]);
 
   useEffect(() => {
     loadReports();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [loadReports]);
 
   useEffect(() => {
     if (rangePreset === 'custom') return;
@@ -87,20 +121,43 @@ export default function ReportsPage() {
     const avgSla = techRows.length
       ? Math.round(techRows.reduce((sum, t) => sum + Number(t.slaCompliance || 0), 0) / techRows.length)
       : 0;
-    return { totalResolved, avgSla, techCount: techRows.length };
-  }, [shiftRows, techRows]);
+    const avgResolutionMinutes = shiftRows.length
+      ? Math.round(shiftRows.reduce((sum, r) => sum + Number(r.avgResolutionMinutes || 0), 0) / shiftRows.length)
+      : 0;
 
-  const aiSummary = useMemo(() => {
-    const outcomes = Array.isArray(aiInsights?.noise_outcomes) ? aiInsights.noise_outcomes : [];
-    const totalFiltered = outcomes
-      .filter((row) => ['ignore', 'quarantine'].includes(String(row.decision || '').toLowerCase()))
-      .reduce((sum, row) => sum + Number(row.total || 0), 0);
+    const created = sumSeriesTotals(activitySeries.created);
+    const closed = sumSeriesTotals(activitySeries.closed);
+    const reopened = sumSeriesTotals(activitySeries.reopened);
+    const overdue = sumSeriesTotals(activitySeries.overdue);
+
+    const closureRate = created > 0 ? Math.round((closed / created) * 100) : 0;
+    const reopenRate = closed > 0 ? Math.round((reopened / closed) * 100) : 0;
+    const backlogDelta = created - closed;
+
+    const topTechnician = [...techRows].sort((a, b) => Number(b.resolved || 0) - Number(a.resolved || 0))[0] || null;
+    const bestShift = [...shiftRows].sort((a, b) => Number(b.resolved || 0) - Number(a.resolved || 0))[0] || null;
+
     return {
-      totalInferences: Number(aiInsights?.summary?.total_inferences_window || 0),
-      needsReview: Number(aiInsights?.summary?.needs_review_window || 0),
-      totalFiltered,
+      totalResolved,
+      avgSla,
+      techCount: techRows.length,
+      avgResolutionMinutes,
+      created,
+      closed,
+      reopened,
+      overdue,
+      closureRate,
+      reopenRate,
+      backlogDelta,
+      topTechnician,
+      bestShift,
     };
-  }, [aiInsights]);
+  }, [shiftRows, techRows, activitySeries]);
+
+  const shiftDetails = useMemo(
+    () => [...shiftRows].sort((a, b) => Number(b.resolved || 0) - Number(a.resolved || 0)),
+    [shiftRows]
+  );
 
   const exportCsv = () => {
     const rows = techRows.map((r) => ({
@@ -144,10 +201,10 @@ export default function ReportsPage() {
       <DashboardLayout>
         <div className="mb-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
           <h1 className="text-2xl font-bold text-gray-900">Reports & Analytics</h1>
-          <p className="mt-1 text-sm text-gray-500">Shift and technician performance within your selected date range.</p>
+          <p className="mt-1 text-sm text-gray-500">Deep analytics for throughput, quality, SLA, shift output, and AI intake outcomes.</p>
         </div>
 
-        <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-3 shadow-sm">
+        <div className="mb-4 rounded-2xl border border-gray-200 bg-white p-3 shadow-sm">
           <div className="grid w-full grid-cols-1 gap-2 rounded-xl border border-gray-200 bg-gray-50 p-2.5 lg:grid-cols-12">
             <select
               value={rangePreset}
@@ -204,42 +261,96 @@ export default function ReportsPage() {
           </div>
         ) : null}
 
-        <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <div className="rounded-xl border border-primary-100 bg-gradient-to-br from-primary-50/80 to-white p-5 shadow-sm backdrop-blur-sm dark:border-violet-700/50 dark:from-slate-900 dark:to-violet-950/60">
-            <p className="text-sm text-slate-500 dark:text-slate-300">Total Resolved</p>
-            <p className="mt-1 text-3xl font-bold text-slate-900 dark:text-white">{summary.totalResolved}</p>
-          </div>
-          <div className="rounded-xl border border-secondary-100 bg-gradient-to-br from-secondary-50/75 to-white p-5 shadow-sm backdrop-blur-sm dark:border-indigo-700/50 dark:from-slate-900 dark:to-indigo-950/60">
-            <p className="text-sm text-slate-500 dark:text-slate-300">Avg SLA Compliance</p>
-            <p className="mt-1 text-3xl font-bold text-slate-900 dark:text-white">{summary.avgSla}%</p>
-          </div>
-          <div className="rounded-xl border border-emerald-100 bg-gradient-to-br from-emerald-50/70 to-white p-5 shadow-sm backdrop-blur-sm dark:border-cyan-700/50 dark:from-slate-900 dark:to-cyan-950/45">
-            <p className="text-sm text-slate-500 dark:text-slate-300">Technicians Tracked</p>
-            <p className="mt-1 text-3xl font-bold text-slate-900 dark:text-white">{summary.techCount}</p>
-          </div>
-        </div>
-
-        <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-            <p className="text-xs uppercase text-gray-500">AI Inferences (window)</p>
-            <p className="mt-1 text-2xl font-bold text-gray-900">{aiSummary.totalInferences}</p>
-          </div>
-          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-            <p className="text-xs uppercase text-gray-500">AI Needs Review</p>
-            <p className="mt-1 text-2xl font-bold text-gray-900">{aiSummary.needsReview}</p>
-          </div>
-          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-            <p className="text-xs uppercase text-gray-500">Filtered Non-ticket/Noise</p>
-            <p className="mt-1 text-2xl font-bold text-gray-900">{aiSummary.totalFiltered}</p>
-          </div>
+        <div className="mb-4 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
+          <ReportStatCard title="Resolved Tickets" value={summary.totalResolved} subtitle="Completed in selected range" icon={TicketCheck} tone="primary" />
+          <ReportStatCard title="Average SLA" value={`${summary.avgSla}%`} subtitle="Technician compliance average" icon={Gauge} tone="secondary" />
+          <ReportStatCard title="Avg Resolution Time" value={formatMinutesToHuman(summary.avgResolutionMinutes)} subtitle="Service completion speed" icon={CheckCircle2} tone="secondary" />
+          <ReportStatCard title="Overdue Pressure" value={summary.overdue} subtitle={`Backlog delta ${summary.backlogDelta}`} icon={TriangleAlert} tone="warning" />
         </div>
 
         {loading ? (
           <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-sm text-gray-500">Loading reports...</div>
         ) : (
-          <div className="grid grid-cols-1 gap-6">
-            <ShiftComparison rows={shiftRows} />
-            <TechnicianLeaderboard rows={techRows} />
+          <div className="grid grid-cols-1 gap-4">
+            <TicketFlowTrend series={activitySeries} startDate={startDate} endDate={endDate} />
+
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+              <ShiftComparison rows={shiftRows} />
+              <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                <h3 className="text-sm font-semibold text-gray-900">Shift Detail Breakdown</h3>
+                <p className="mt-1 text-xs text-gray-500">Resolved output and average resolution time by shift.</p>
+                <div className="mt-3 overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Shift</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Resolved</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Avg Resolution</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {shiftDetails.map((row) => (
+                        <tr key={row.shift || 'unassigned'}>
+                          <td className="px-3 py-2 font-medium text-gray-900">{row.shift || 'UNASSIGNED'}</td>
+                          <td className="px-3 py-2 text-gray-700">{Number(row.resolved || 0)}</td>
+                          <td className="px-3 py-2 text-gray-700">{Math.round(Number(row.avgResolutionMinutes || 0))} mins</td>
+                        </tr>
+                      ))}
+                      {shiftDetails.length === 0 ? (
+                        <tr>
+                          <td colSpan={3} className="px-3 py-4 text-center text-gray-500">
+                            No shift performance records in selected range.
+                          </td>
+                        </tr>
+                      ) : null}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+              <TechnicianSlaChart rows={techRows} />
+              <SlaDistributionChart rows={techRows} />
+              <section id="ai-analytics" className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm xl:col-span-2">
+                <h3 className="text-sm font-semibold text-gray-900">AI Intake & Review Analytics</h3>
+                <p className="mt-1 text-xs text-gray-500">
+                  Deep AI metrics are centralized here so the AI Review page can stay action-focused.
+                </p>
+                <AiReviewAnalyticsPanel dashboard={aiInsights} />
+              </section>
+            </div>
+
+            <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+              <h3 className="text-sm font-semibold text-gray-900">Operational Snapshot</h3>
+              <p className="mt-1 text-xs text-gray-500">Non-duplicate summary signals that complement the charts above.</p>
+              <div className="mt-3 grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-2">
+                <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                  <p className="text-[11px] uppercase tracking-wide text-gray-500">Top Technician</p>
+                  <p className="mt-1 text-sm font-semibold text-gray-900">{summary.topTechnician?.name || 'No data'}</p>
+                </div>
+                <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                  <p className="text-[11px] uppercase tracking-wide text-gray-500">Best Shift</p>
+                  <p className="mt-1 text-sm font-semibold text-gray-900">{summary.bestShift?.shift || 'No data'}</p>
+                </div>
+                <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                  <p className="text-[11px] uppercase tracking-wide text-gray-500">Closure Rate</p>
+                  <p className="mt-1 text-sm font-semibold text-gray-900">{summary.closureRate}%</p>
+                </div>
+                <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                  <p className="text-[11px] uppercase tracking-wide text-gray-500">Reopen Rate</p>
+                  <p className="mt-1 text-sm font-semibold text-gray-900">{summary.reopenRate}%</p>
+                </div>
+                <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                  <p className="text-[11px] uppercase tracking-wide text-gray-500">Created vs Closed</p>
+                  <p className="mt-1 text-sm font-semibold text-gray-900">{summary.created} vs {summary.closed}</p>
+                </div>
+                <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                  <p className="text-[11px] uppercase tracking-wide text-gray-500">Resolution Time</p>
+                  <p className="mt-1 text-sm font-semibold text-gray-900">{formatMinutesToHuman(summary.avgResolutionMinutes)}</p>
+                </div>
+              </div>
+            </section>
           </div>
         )}
       </DashboardLayout>
