@@ -20,6 +20,9 @@ const {
 
 const ALLOWED_STATUSES = getAllowedStatuses();
 
+const DEFAULT_TICKET_LOCK_MINUTES = 10;
+let ticketLockColumnsAvailable = null;
+
 function buildTicketSelect(overdueDays = 3) {
   const safeOverdueDays = Math.max(1, Math.min(30, Number(overdueDays || 3)));
   return `
@@ -72,6 +75,87 @@ function buildTicketSelect(overdueDays = 3) {
   LEFT JOIN users assignee ON assignee.id = t.assigned_to_user_id
   LEFT JOIN users requester ON requester.id = t.requester_user_id
 `;
+}
+
+function isOpsRole(role) {
+  const normalized = String(role || '').trim().toLowerCase();
+  return ['technician', 'admin', 'agent'].includes(normalized);
+}
+
+function clampLockMinutes(value) {
+  const minutes = Number(value);
+  if (!Number.isFinite(minutes)) return DEFAULT_TICKET_LOCK_MINUTES;
+  return Math.max(1, Math.min(60, Math.floor(minutes)));
+}
+
+async function supportsTicketLockColumns() {
+  if (ticketLockColumnsAvailable !== null) return ticketLockColumnsAvailable;
+  try {
+    const [rows] = await db.query(
+      `SELECT COUNT(*) AS total
+       FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE()
+         AND TABLE_NAME = 'tickets'
+         AND COLUMN_NAME IN ('locked_by_user_id', 'lock_expires_at', 'locked_at')`
+    );
+    ticketLockColumnsAvailable = Number(rows?.[0]?.total || 0) >= 3;
+  } catch {
+    ticketLockColumnsAvailable = false;
+  }
+  return ticketLockColumnsAvailable;
+}
+
+async function clearExpiredTicketLock(ticketId) {
+  if (!(await supportsTicketLockColumns())) return;
+  await db.query(
+    `UPDATE tickets
+     SET locked_by_user_id = NULL,
+         locked_at = NULL,
+         lock_expires_at = NULL,
+         updated_at = updated_at
+     WHERE id = ?
+       AND lock_expires_at IS NOT NULL
+       AND lock_expires_at <= NOW()`,
+    [ticketId]
+  );
+}
+
+async function fetchTicketLock(ticketId) {
+  if (!(await supportsTicketLockColumns())) {
+    return {
+      is_locked: false,
+      locked_by_user_id: null,
+      locked_by_name: null,
+      locked_at: null,
+      lock_expires_at: null,
+    };
+  }
+  const [rows] = await db.query(
+    `SELECT t.locked_by_user_id,
+            t.locked_at,
+            t.lock_expires_at,
+            u.full_name AS locked_by_name
+     FROM tickets t
+     LEFT JOIN users u ON u.id = t.locked_by_user_id
+     WHERE t.id = ?
+       AND t.is_deleted = 0
+     LIMIT 1`,
+    [ticketId]
+  );
+
+  if (!rows.length) return null;
+
+  const row = rows[0];
+  const expiresAt = row.lock_expires_at ? new Date(row.lock_expires_at).getTime() : 0;
+  const isLocked = Boolean(row.locked_by_user_id) && expiresAt > Date.now();
+
+  return {
+    is_locked: isLocked,
+    locked_by_user_id: row.locked_by_user_id ? Number(row.locked_by_user_id) : null,
+    locked_by_name: row.locked_by_name || null,
+    locked_at: row.locked_at || null,
+    lock_expires_at: row.lock_expires_at || null,
+  };
 }
 
 function stripHtml(input = '') {
@@ -716,6 +800,19 @@ const addTicketComment = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Ticket not found' });
     }
 
+    if (!is_internal) {
+      await clearExpiredTicketLock(ticketId);
+      const lock = await fetchTicketLock(ticketId);
+      const requesterId = Number(req.user?.id || 0);
+      if (lock?.is_locked && Number(lock.locked_by_user_id || 0) !== requesterId) {
+        return res.status(409).json({
+          success: false,
+          message: `Ticket is locked by ${lock.locked_by_name || 'another user'}.`,
+          data: lock,
+        });
+      }
+    }
+
     let finalCommentText = String(comment_text || '').trim();
     let emailSubject = `${ticket.ticket_number || `TKT-${ticketId}`} Ticket Update`;
 
@@ -797,6 +894,19 @@ const addTicketComment = async (req, res) => {
       });
     }
 
+    if (!is_internal && Number(req.user?.id || 0)) {
+      await db.query(
+        `UPDATE tickets
+         SET locked_by_user_id = NULL,
+             locked_at = NULL,
+             lock_expires_at = NULL,
+             updated_at = updated_at
+         WHERE id = ?
+           AND locked_by_user_id = ?`,
+        [ticketId, req.user.id]
+      );
+    }
+
     const notifyIds = [ticket.assigned_to, ticket.created_by].filter((id) => Number(id) !== Number(req.user?.id || 0));
     await notifyUsers(notifyIds, {
       typeCode: 'ticket_comment_added',
@@ -817,6 +927,146 @@ const addTicketComment = async (req, res) => {
   } catch (error) {
     console.error('Error adding comment:', error);
     return res.status(500).json({ success: false, message: 'Failed to add comment', error: error.message });
+  }
+};
+
+const getTicketLock = async (req, res) => {
+  try {
+    if (!isOpsRole(req.user?.role)) {
+      return res.status(403).json({ success: false, message: 'Forbidden' });
+    }
+
+    const ticketId = Number(req.params.id);
+    const ticket = await fetchTicketById(ticketId);
+    if (!ticket) {
+      return res.status(404).json({ success: false, message: 'Ticket not found' });
+    }
+
+    if (!(await supportsTicketLockColumns())) {
+      return res.json({
+        success: true,
+        data: { is_locked: false, locked_by_user_id: null, locked_by_name: null, locked_at: null, lock_expires_at: null },
+      });
+    }
+
+    await clearExpiredTicketLock(ticketId);
+    const lock = await fetchTicketLock(ticketId);
+    return res.json({ success: true, data: lock });
+  } catch (error) {
+    console.error('Error fetching ticket lock:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch ticket lock', error: error.message });
+  }
+};
+
+const lockTicket = async (req, res) => {
+  try {
+    if (!isOpsRole(req.user?.role)) {
+      return res.status(403).json({ success: false, message: 'Forbidden' });
+    }
+
+    const ticketId = Number(req.params.id);
+    const ticket = await fetchTicketById(ticketId);
+    if (!ticket) {
+      return res.status(404).json({ success: false, message: 'Ticket not found' });
+    }
+
+    if (!(await supportsTicketLockColumns())) {
+      return res.status(501).json({
+        success: false,
+        message: 'Ticket locking is not enabled in the database schema.',
+      });
+    }
+
+    const requesterId = Number(req.user?.id || 0);
+    if (!requesterId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const minutes = clampLockMinutes(req.body?.minutes);
+    await clearExpiredTicketLock(ticketId);
+
+    const [result] = await db.query(
+      `UPDATE tickets
+       SET locked_by_user_id = ?,
+           locked_at = NOW(),
+           lock_expires_at = DATE_ADD(NOW(), INTERVAL ? MINUTE),
+           updated_at = updated_at
+       WHERE id = ?
+         AND is_deleted = 0
+         AND (lock_expires_at IS NULL OR lock_expires_at <= NOW() OR locked_by_user_id = ?)`,
+      [requesterId, minutes, ticketId, requesterId]
+    );
+
+    if (!result.affectedRows) {
+      const lock = await fetchTicketLock(ticketId);
+      return res.status(409).json({
+        success: false,
+        message: `Ticket is locked by ${lock?.locked_by_name || 'another user'}.`,
+        data: lock,
+      });
+    }
+
+    const lock = await fetchTicketLock(ticketId);
+    return res.json({ success: true, data: lock });
+  } catch (error) {
+    console.error('Error locking ticket:', error);
+    return res.status(500).json({ success: false, message: 'Failed to lock ticket', error: error.message });
+  }
+};
+
+const unlockTicket = async (req, res) => {
+  try {
+    if (!isOpsRole(req.user?.role)) {
+      return res.status(403).json({ success: false, message: 'Forbidden' });
+    }
+
+    const ticketId = Number(req.params.id);
+    const ticket = await fetchTicketById(ticketId);
+    if (!ticket) {
+      return res.status(404).json({ success: false, message: 'Ticket not found' });
+    }
+
+    if (!(await supportsTicketLockColumns())) {
+      return res.status(501).json({
+        success: false,
+        message: 'Ticket locking is not enabled in the database schema.',
+      });
+    }
+
+    const requesterId = Number(req.user?.id || 0);
+    if (!requesterId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const [result] = await db.query(
+      `UPDATE tickets
+       SET locked_by_user_id = NULL,
+           locked_at = NULL,
+           lock_expires_at = NULL,
+           updated_at = updated_at
+       WHERE id = ?
+         AND is_deleted = 0
+         AND locked_by_user_id = ?`,
+      [ticketId, requesterId]
+    );
+
+    if (!result.affectedRows) {
+      await clearExpiredTicketLock(ticketId);
+      const lock = await fetchTicketLock(ticketId);
+      if (lock?.is_locked) {
+        return res.status(409).json({
+          success: false,
+          message: `Ticket is locked by ${lock.locked_by_name || 'another user'}.`,
+          data: lock,
+        });
+      }
+    }
+
+    const lock = await fetchTicketLock(ticketId);
+    return res.json({ success: true, data: lock });
+  } catch (error) {
+    console.error('Error unlocking ticket:', error);
+    return res.status(500).json({ success: false, message: 'Failed to unlock ticket', error: error.message });
   }
 };
 
@@ -1045,5 +1295,8 @@ module.exports = {
   getTicketSLAStatus,
   getTicketComments,
   addTicketComment,
+  getTicketLock,
+  lockTicket,
+  unlockTicket,
   softDeleteTicket,
 };

@@ -153,6 +153,19 @@ class API {
     return this.get(`/tickets/${ticketId}/comments`);
   }
 
+  async getTicketLock(ticketId) {
+    return this.get(`/tickets/${ticketId}/lock`);
+  }
+
+  async lockTicket(ticketId, minutes = null) {
+    const body = minutes ? { minutes } : {};
+    return this.post(`/tickets/${ticketId}/lock`, body);
+  }
+
+  async unlockTicket(ticketId) {
+    return this.delete(`/tickets/${ticketId}/lock`);
+  }
+
   async addTicketComment(ticketId, commentText, isInternal = false) {
     if (typeof commentText === 'object' && commentText !== null) {
       return this.post(`/tickets/${ticketId}/comments`, commentText);

@@ -12,6 +12,7 @@ import {
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import api from '@/lib/api';
+import LoadingState from '@/components/common/LoadingState';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
 const EMPTY_SERIES = { created: [], closed: [], reopened: [], overdue: [], collab: [] };
@@ -211,7 +212,7 @@ export default function TicketActivityChart({ startDate, endDate, refreshKey = 0
       ) : null}
       <div className="h-[320px] rounded-lg border border-gray-200 bg-gray-50 p-2">
         {loading ? (
-          <div className="p-4 text-sm text-gray-500">Loading activity chart...</div>
+          <LoadingState type="inline" label="Loading activity chart..." className="h-full min-h-0" />
         ) : hasData ? (
           <Line data={chartData} options={options} />
         ) : (

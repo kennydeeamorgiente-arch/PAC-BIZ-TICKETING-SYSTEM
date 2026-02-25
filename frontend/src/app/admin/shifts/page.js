@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Save, Clock3, RotateCcw } from 'lucide-react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
+import LoadingState from '@/components/common/LoadingState';
 import api from '@/lib/api';
 
 function toTimeInput(value) {
@@ -96,7 +97,7 @@ export default function AdminShiftsPage() {
         ) : null}
 
         {loading ? (
-          <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-sm text-gray-500">Loading shifts...</div>
+          <LoadingState label="Loading shifts..." />
         ) : shifts.length === 0 ? (
           <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-sm text-gray-500">No shifts found.</div>
         ) : (

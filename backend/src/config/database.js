@@ -3,7 +3,7 @@ require('dotenv').config();
 
 // Database connection configuration
 const dbConfig = {
-    host: process.env.DB_HOST || 'localhost',
+    host: process.env.DB_HOST || '192.168.1.187',
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'it_ticketing_v2',

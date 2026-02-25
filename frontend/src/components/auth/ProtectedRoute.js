@@ -3,6 +3,8 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import LoadingState from '@/components/common/LoadingState';
+import DashboardLayout from '@/components/layout/DashboardLayout';
 
 export default function ProtectedRoute({ children, allowedRoles = [] }) {
   const { user, loading } = useAuth();
@@ -25,12 +27,9 @@ export default function ProtectedRoute({ children, allowedRoles = [] }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-secondary-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
-        </div>
-      </div>
+      <DashboardLayout>
+        <LoadingState label="Loading account..." />
+      </DashboardLayout>
     );
   }
 

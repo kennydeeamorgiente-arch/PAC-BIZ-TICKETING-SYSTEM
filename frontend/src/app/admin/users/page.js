@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Plus, UserCog, Search, ShieldAlert } from 'lucide-react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
+import LoadingState from '@/components/common/LoadingState';
 import api from '@/lib/api';
 
 const ROLES = ['technician', 'admin'];
@@ -212,7 +213,7 @@ export default function AdminUsersPage() {
         ) : null}
 
         {loading ? (
-          <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-sm text-gray-500">Loading users...</div>
+          <LoadingState label="Loading users..." />
         ) : (
           <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
             <div className="overflow-x-auto">

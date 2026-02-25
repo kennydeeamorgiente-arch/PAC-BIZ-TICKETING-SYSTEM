@@ -5,6 +5,7 @@ import { CheckCircle2, Gauge, TicketCheck, TriangleAlert } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
+import LoadingState from '@/components/common/LoadingState';
 import ShiftComparison from '@/components/reports/ShiftComparison';
 import ReportStatCard from '@/components/reports/ReportStatCard';
 import TicketFlowTrend from '@/components/reports/TicketFlowTrend';
@@ -299,7 +300,7 @@ export default function ReportsPage() {
         </div>
 
         {loading ? (
-          <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-sm text-gray-500">Loading reports...</div>
+          <LoadingState label="Loading reports..." />
         ) : (
           <div className="grid grid-cols-1 gap-4">
             <TicketFlowTrend series={activitySeries} startDate={startDate} endDate={endDate} />

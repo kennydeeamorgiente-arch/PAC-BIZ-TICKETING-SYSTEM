@@ -42,6 +42,51 @@ async function run() {
   }
   console.log('OK: /auth/me');
 
+  const createRes = await fetch(`${API_BASE_URL}/tickets`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${loginData.token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      title: `Smoke Ticket Lock ${Date.now()}`,
+      description: 'Smoke test ticket for lock/unlock endpoints.',
+      priority: 'medium',
+    }),
+  });
+  const createData = await parseJsonSafe(createRes);
+  const createdTicketId = createData?.data?.id || createData?.data?.ticket?.id || createData?.data?.ticket_id || null;
+  if (!createRes.ok || !createdTicketId) {
+    throw new Error(`Create ticket failed: ${JSON.stringify(createData)}`);
+  }
+  console.log('OK: /tickets (create)');
+
+  const lockRes = await fetch(`${API_BASE_URL}/tickets/${createdTicketId}/lock`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${loginData.token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({}),
+  });
+  const lockData = await parseJsonSafe(lockRes);
+  const lockRow = lockData?.data || null;
+  if (!lockRes.ok || !lockRow?.is_locked || Number(lockRow.locked_by_user_id || 0) !== Number(meData.id)) {
+    throw new Error(`Lock ticket failed: ${JSON.stringify(lockData)}`);
+  }
+  console.log('OK: /tickets/:id/lock (lock)');
+
+  const unlockRes = await fetch(`${API_BASE_URL}/tickets/${createdTicketId}/lock`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${loginData.token}` },
+  });
+  const unlockData = await parseJsonSafe(unlockRes);
+  const unlockRow = unlockData?.data || null;
+  if (!unlockRes.ok || unlockRow?.is_locked) {
+    throw new Error(`Unlock ticket failed: ${JSON.stringify(unlockData)}`);
+  }
+  console.log('OK: /tickets/:id/lock (unlock)');
+
   console.log('Smoke test passed.');
 }
 

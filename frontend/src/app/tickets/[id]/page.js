@@ -10,6 +10,7 @@ import SLATimer from '@/components/tickets/SLATimer';
 import Badge from '@/components/common/Badge';
 import Modal from '@/components/common/Modal';
 import Button from '@/components/common/Button';
+import LoadingState from '@/components/common/LoadingState';
 import api from '@/lib/api';
 import { useSLA } from '@/hooks/useSLA';
 import { validateTicketComment } from '@/lib/validation';
@@ -72,6 +73,9 @@ export default function TicketDetailPage() {
   const [reevaluatingPriority, setReevaluatingPriority] = useState(false);
   const [deletingTicket, setDeletingTicket] = useState(false);
   const [desktopRightActions, setDesktopRightActions] = useState(false);
+  const [lock, setLock] = useState(null);
+  const [locking, setLocking] = useState(false);
+  const [unlocking, setUnlocking] = useState(false);
   const headerSectionRef = useRef(null);
 
   const liveSla = useSLA({
@@ -86,11 +90,12 @@ export default function TicketDetailPage() {
     if (showLoader) setLoading(true);
     setError('');
     try {
-      const [ticketData, slaData, commentsData, usersData] = await Promise.all([
+      const [ticketData, slaData, commentsData, usersData, lockData] = await Promise.all([
         api.getTicket(id),
         api.get(`/tickets/${id}/sla`),
         api.getTicketComments(id),
         api.getUsers(),
+        api.getTicketLock(id),
       ]);
 
       let priorityData = null;
@@ -105,11 +110,13 @@ export default function TicketDetailPage() {
       const slaRow = slaData?.data || slaData || { totalMinutes: 0, isActive: false, formattedTime: '0h 0m' };
       const commentRows = Array.isArray(commentsData?.data) ? commentsData.data : Array.isArray(commentsData) ? commentsData : [];
       const userRows = Array.isArray(usersData?.data) ? usersData.data : Array.isArray(usersData) ? usersData : [];
+      const lockRow = lockData?.data || lockData || null;
 
       setTicket(ticketRow);
       setSla(slaRow);
       setComments(commentRows);
       setUsers(userRows.filter((u) => ['technician', 'agent', 'admin'].includes(String(u.role || '').toLowerCase())));
+      setLock(lockRow);
       setPriorityInsights(priorityData);
       setPriorityForm((prev) => ({
         ...prev,
@@ -123,10 +130,55 @@ export default function TicketDetailPage() {
       setSla({ totalMinutes: 0, isActive: false, formattedTime: '0h 0m' });
       setPriorityInsights(null);
       setPriorityForm({ priority: '', reason: '' });
+      setLock(null);
     } finally {
       if (showLoader) setLoading(false);
     }
   }, [id]);
+
+  const refreshLock = useCallback(async () => {
+    if (!id) return;
+    try {
+      const lockData = await api.getTicketLock(id);
+      setLock(lockData?.data || lockData || null);
+    } catch {
+      setLock(null);
+    }
+  }, [id]);
+
+  const ensureExternalLock = useCallback(async () => {
+    if (!id || !user?.id) return false;
+    if (lock?.is_locked && Number(lock?.locked_by_user_id || 0) === Number(user.id)) return true;
+
+    setLocking(true);
+    setError('');
+    try {
+      const resp = await api.lockTicket(id);
+      setLock(resp?.data || resp || null);
+      return true;
+    } catch (e) {
+      setError(e?.message || 'Ticket is locked by another user.');
+      await refreshLock();
+      return false;
+    } finally {
+      setLocking(false);
+    }
+  }, [id, lock?.is_locked, lock?.locked_by_user_id, refreshLock, user?.id]);
+
+  const releaseLock = useCallback(async () => {
+    if (!id || !user?.id) return;
+    if (!lock?.is_locked || Number(lock?.locked_by_user_id || 0) !== Number(user.id)) return;
+
+    setUnlocking(true);
+    try {
+      const resp = await api.unlockTicket(id);
+      setLock(resp?.data || resp || null);
+    } catch {
+      await refreshLock();
+    } finally {
+      setUnlocking(false);
+    }
+  }, [id, lock?.is_locked, lock?.locked_by_user_id, refreshLock, user?.id]);
 
   const refreshPriorityInsights = useCallback(async () => {
     if (!id) return;
@@ -269,6 +321,11 @@ export default function TicketDetailPage() {
       return;
     }
 
+    if (!isInternal) {
+      const ok = await ensureExternalLock();
+      if (!ok) return;
+    }
+
     setPostingComment(true);
     setError('');
     try {
@@ -300,8 +357,10 @@ export default function TicketDetailPage() {
         await loadData({ showLoader: false });
       }
       await refreshPriorityInsights();
+      await refreshLock();
     } catch (err) {
       setError(err?.message || 'Could not post comment');
+      await refreshLock();
     } finally {
       setPostingComment(false);
     }
@@ -375,6 +434,7 @@ export default function TicketDetailPage() {
     }
 
     setIsInternal(false);
+    await ensureExternalLock();
   };
 
   useEffect(() => {
@@ -426,13 +486,47 @@ export default function TicketDetailPage() {
     return () => window.removeEventListener('resize', updateFromNodeWidth);
   }, [ticket]);
 
+  useEffect(() => {
+    if (!id) return undefined;
+    const timer = setInterval(() => {
+      refreshLock();
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [id, refreshLock]);
+
+  useEffect(() => {
+    const hasDraft = Boolean(commentText.trim()) || attachments.length > 0;
+    if (!hasDraft || isInternal) return undefined;
+    if (!lock?.is_locked || Number(lock?.locked_by_user_id || 0) !== Number(user?.id || 0)) return undefined;
+
+    const timer = setInterval(() => {
+      api.lockTicket(id).then((resp) => {
+        setLock(resp?.data || resp || null);
+      }).catch(() => {});
+    }, 120000);
+
+    return () => clearInterval(timer);
+  }, [attachments.length, commentText, id, isInternal, lock?.is_locked, lock?.locked_by_user_id, user?.id]);
+
+  useEffect(() => {
+    const hasDraft = Boolean(commentText.trim()) || attachments.length > 0;
+    if (hasDraft) return;
+    if (isInternal) return;
+    if (!lock?.is_locked || Number(lock?.locked_by_user_id || 0) !== Number(user?.id || 0)) return;
+    if (postingComment || locking) return;
+    releaseLock();
+  }, [attachments.length, commentText, isInternal, lock?.is_locked, lock?.locked_by_user_id, locking, postingComment, releaseLock, user?.id]);
+
+  const lockOwnerId = Number(lock?.locked_by_user_id || 0);
+  const lockActive = Boolean(lock?.is_locked);
+  const isLockedByMe = lockActive && lockOwnerId && lockOwnerId === Number(user?.id || 0);
+  const isLockedByOther = lockActive && lockOwnerId && lockOwnerId !== Number(user?.id || 0);
+
   return (
     <ProtectedRoute allowedRoles={['technician', 'admin']}>
       <DashboardLayout>
         {loading ? (
-          <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-sm text-gray-500">
-            Loading ticket details...
-          </div>
+          <LoadingState label="Loading ticket details..." />
         ) : (
           <div className="mx-auto w-full max-w-[1500px] space-y-6">
             <button
@@ -553,6 +647,31 @@ export default function TicketDetailPage() {
                 </div>
 
                 <form onSubmit={onSubmitComment} className="mb-4 space-y-3 rounded-lg border border-gray-200 p-3">
+                  {lockActive ? (
+                    <div
+                      className={`rounded-lg border px-3 py-2 text-sm ${
+                        isLockedByOther ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="min-w-0 truncate">
+                          {isLockedByOther
+                            ? `Locked by ${lock?.locked_by_name || 'another user'}`
+                            : `Locked by you`}
+                          {lock?.lock_expires_at ? ` (expires ${formatDate(lock.lock_expires_at)})` : ''}
+                        </span>
+                        {isLockedByMe ? (
+                          <Button type="button" variant="secondary" size="sm" loading={unlocking} onClick={releaseLock}>
+                            Unlock
+                          </Button>
+                        ) : (
+                          <Button type="button" variant="secondary" size="sm" onClick={refreshLock}>
+                            Refresh
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
                   <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                     <select
                       value={selectedTemplate}
@@ -581,6 +700,10 @@ export default function TicketDetailPage() {
                   </div>
                   <textarea
                     value={commentText}
+                    onFocus={() => {
+                      if (!isInternal) ensureExternalLock();
+                    }}
+                    disabled={!isInternal && isLockedByOther}
                     onChange={(e) => setCommentText(e.target.value)}
                     placeholder="Write a message to requester or internal note..."
                     rows={4}
@@ -597,6 +720,7 @@ export default function TicketDetailPage() {
                         onChange={(e) => {
                           const files = Array.from(e.target.files || []);
                           setAttachments((prev) => [...prev, ...files].slice(0, 5));
+                          if (!isInternal && files.length) ensureExternalLock();
                           e.target.value = '';
                         }}
                       />
@@ -626,13 +750,21 @@ export default function TicketDetailPage() {
                     <input
                       type="checkbox"
                       checked={isInternal}
-                      onChange={(e) => setIsInternal(e.target.checked)}
+                      onChange={(e) => {
+                        const next = e.target.checked;
+                        setIsInternal(next);
+                        if (!next) {
+                          ensureExternalLock();
+                        } else {
+                          releaseLock();
+                        }
+                      }}
                       className="mr-2"
                     />
                     Internal note (visible to IT team only)
                   </label>
                   <div className="flex justify-end">
-                    <Button type="submit" loading={postingComment}>
+                    <Button type="submit" loading={postingComment || locking} disabled={!isInternal && isLockedByOther}>
                       <Send className="mr-1 h-4 w-4" />
                       {isInternal ? 'Post Internal Note' : 'Send Update (Email + Thread)'}
                     </Button>

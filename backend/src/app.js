@@ -18,7 +18,7 @@ const app = express();
 
 app.use(helmet());
 
-const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001')
+const allowedOrigins = (process.env.CORS_ORIGIN || 'http://192.168.1.187:3000,http://192.168.1.187:3001,http://127.0.0.1:3000,http://127.0.0.1:3001')
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
@@ -28,7 +28,7 @@ const isDevLocalOrigin = (origin) => {
   if (allowedOrigins.includes(origin)) return true;
 
   if (process.env.NODE_ENV === 'development') {
-    return /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+)(:\d+)?$/i.test(origin);
+    return /^https?:\/\/(192.168.1.187|127\.0\.0\.1|192\.168\.\d+\.\d+)(:\d+)?$/i.test(origin);
   }
 
   return false;

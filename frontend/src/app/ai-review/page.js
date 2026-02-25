@@ -7,6 +7,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import Button from '@/components/common/Button';
 import Badge from '@/components/common/Badge';
+import LoadingState from '@/components/common/LoadingState';
 import api from '@/lib/api';
 import { formatDate } from '@/lib/utils';
 
@@ -280,7 +281,7 @@ export default function AiReviewPage() {
         </div>
 
         {loading ? (
-          <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-sm text-gray-500">Loading AI queue...</div>
+          <LoadingState label="Loading AI queue..." />
         ) : queueRows.length === 0 ? (
           <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-sm text-gray-500">No items in this queue.</div>
         ) : (

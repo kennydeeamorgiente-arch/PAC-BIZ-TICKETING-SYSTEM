@@ -111,6 +111,9 @@ CREATE TABLE tickets (
   requester_user_id BIGINT UNSIGNED NOT NULL,
   created_by_user_id BIGINT UNSIGNED NOT NULL,
   assigned_to_user_id BIGINT UNSIGNED NULL,
+  locked_by_user_id BIGINT UNSIGNED NULL,
+  locked_at DATETIME NULL,
+  lock_expires_at DATETIME NULL,
   category_id SMALLINT UNSIGNED NULL,
   priority_id TINYINT UNSIGNED NOT NULL,
   status_id TINYINT UNSIGNED NOT NULL,
@@ -125,6 +128,7 @@ CREATE TABLE tickets (
   CONSTRAINT fk_tickets_requester FOREIGN KEY (requester_user_id) REFERENCES users(id),
   CONSTRAINT fk_tickets_created_by FOREIGN KEY (created_by_user_id) REFERENCES users(id),
   CONSTRAINT fk_tickets_assigned_to FOREIGN KEY (assigned_to_user_id) REFERENCES users(id),
+  CONSTRAINT fk_tickets_locked_by FOREIGN KEY (locked_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
   CONSTRAINT fk_tickets_category FOREIGN KEY (category_id) REFERENCES ticket_categories(id),
   CONSTRAINT fk_tickets_priority FOREIGN KEY (priority_id) REFERENCES ticket_priorities(id),
   CONSTRAINT fk_tickets_status FOREIGN KEY (status_id) REFERENCES ticket_statuses(id),
@@ -407,6 +411,7 @@ CREATE INDEX idx_tickets_status_assigned ON tickets(status_id, assigned_to_user_
 CREATE INDEX idx_tickets_priority_status ON tickets(priority_id, status_id);
 CREATE INDEX idx_tickets_created_at ON tickets(created_at);
 CREATE INDEX idx_tickets_requester ON tickets(requester_user_id);
+CREATE INDEX idx_tickets_lock_expires_at ON tickets(lock_expires_at);
 CREATE INDEX idx_comments_ticket_created ON ticket_comments(ticket_id, created_at);
 CREATE INDEX idx_attachments_ticket ON ticket_attachments(ticket_id);
 CREATE INDEX idx_email_ticket_direction ON email_messages(ticket_id, direction);

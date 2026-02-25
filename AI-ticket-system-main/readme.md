@@ -85,7 +85,7 @@ A smart ticket management system that uses AI to automatically categorize, prior
    GEMINI_API_KEY=your_gemini_api_key
 
    # Application
-   APP_URL=http://localhost:3000
+   APP_URL=http://192.168.1.187:3000
    ```
 
 ## 🚀 Running the Application
@@ -155,11 +155,11 @@ A smart ticket management system that uses AI to automatically categorize, prior
    npm run inngest-dev
    ```
 
-   This will start the Inngest development server at http://localhost:8288
+   This will start the Inngest development server at http://192.168.1.187:8288
 
 2. **Test Ticket Creation**
    ```bash
-   curl -X POST http://localhost:3000/api/tickets \
+   curl -X POST http://192.168.1.187:3000/api/tickets \
    -H "Content-Type: application/json" \
    -H "Authorization: Bearer YOUR_JWT_TOKEN" \
    -d '{

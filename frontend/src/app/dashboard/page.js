@@ -10,6 +10,7 @@ import ShiftTimer from '@/components/dashboard/ShiftTimer';
 import RecentActivity from '@/components/dashboard/RecentActivity';
 import TicketActivityChart from '@/components/dashboard/TicketActivityChart';
 import StatusBreakdownChart from '@/components/dashboard/StatusBreakdownChart';
+import LoadingState from '@/components/common/LoadingState';
 import { useAuth } from '@/context/AuthContext';
 import { useTickets } from '@/hooks/useTickets';
 import { useRealtime } from '@/hooks/useRealtime';
@@ -251,9 +252,7 @@ export default function DashboardPage() {
           ) : null}
 
           {loading ? (
-            <div className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-600">
-              Loading latest tickets...
-            </div>
+            <LoadingState label="Loading latest tickets..." />
           ) : null}
 
           <div className="grid grid-cols-[repeat(auto-fit,minmax(210px,1fr))] gap-3">

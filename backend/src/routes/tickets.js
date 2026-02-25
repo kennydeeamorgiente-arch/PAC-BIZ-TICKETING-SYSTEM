@@ -48,8 +48,13 @@ router.delete('/:id', requireAuth, ticketController.softDeleteTicket);
 // GET /api/tickets/:id/comments - Ticket discussion thread
 router.get('/:id/comments', requireAuth, ticketController.getTicketComments);
 
-// POST /api/tickets/:id/comments - Add a ticket comment
 router.post('/:id/comments', requireAuth, ticketController.addTicketComment);
+
+router.get('/:id/lock', requireAuth, ticketController.getTicketLock);
+
+router.post('/:id/lock', requireAuth, ticketController.lockTicket);
+
+router.delete('/:id/lock', requireAuth, ticketController.unlockTicket);
 
 // GET /api/tickets/:id/sla - Get SLA status and elapsed minutes
 router.get('/:id/sla', requireAuth, ticketController.getTicketSLAStatus);

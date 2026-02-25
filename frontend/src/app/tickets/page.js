@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { KanbanSquare, Table2, Search, ArrowDown, ArrowUp } from 'lucide-react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
+import LoadingState from '@/components/common/LoadingState';
 import TicketCard from '@/components/tickets/TicketCard';
 import TicketTable from '@/components/tickets/TicketTable';
 import { useTickets } from '@/hooks/useTickets';
@@ -227,8 +228,8 @@ export default function TicketsPage() {
         ) : null}
 
         {loading ? (
-          <div className="mb-4 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-600">
-            Loading latest tickets...
+          <div className="mb-4">
+            <LoadingState label="Loading latest tickets..." />
           </div>
         ) : null}
 
